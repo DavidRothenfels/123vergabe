@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>🔧 OpenCode Debug Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .status.ok { background: #d4edda; color: #155724; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .status.pending { background: #fff3cd; color: #856404; }
+    button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+    .log { background: #000; color: #0f0; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    .endpoint { background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 4px solid #007bff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 OpenCode Multiuser Debug Dashboard</h1>
+    
+    <div class="grid">
+      <!-- Service Status -->
+      <div class="card">
+        <h2>🚀 Service Status</h2>
+        <div id="pocketbase-status" class="status pending">PocketBase: Prüfe...</div>
+        <div id="opencode-status" class="status pending">OpenCode Service: Prüfe...</div>
+        <div id="auth-status" class="status pending">Authentication: Nicht eingeloggt</div>
+        <button class="btn-primary" onclick="checkServices()">🔄 Services prüfen</button>
+      </div>
+
+      <!-- Authentication -->
+      <div class="card">
+        <h2>🔐 Authentication</h2>
+        <input id="email" placeholder="E-Mail" value="test@test.com">
+        <input id="password" type="password" placeholder="Passwort" value="test123456">
+        <button class="btn-success" onclick="login()">Login</button>
+        <button class="btn-secondary" onclick="logout()">Logout</button>
+        <div id="token-info"></div>
+      </div>
+
+      <!-- API Tests -->
+      <div class="card">
+        <h2>🧪 API Tests</h2>
+        <div class="endpoint">
+          <strong>GET /test</strong>
+          <button class="btn-primary" onclick="testHookBasic()">Test Hook</button>
+          <div id="hook-basic-result"></div>
+        </div>
+        
+        <div class="endpoint">
+          <strong>GET /opencode/stream</strong>
+          <input id="test-prompt" placeholder="Test Prompt" value="Hello World">
+          <button class="btn-primary" onclick="testOpenCodeEndpoint()">Test OpenCode Hook</button>
+          <div id="opencode-result"></div>
+        </div>
+
+        <div class="endpoint">
+          <strong>Node.js Service Direct</strong>
+          <button class="btn-primary" onclick="testNodeService()">Test Node.js Direct</button>
+          <div id="node-result"></div>
+        </div>
+      </div>
+
+      <!-- Live Test -->
+      <div class="card">
+        <h2>📡 Live OpenCode Test</h2>
+        <textarea id="live-prompt" placeholder="Dein Prompt hier...">Schreibe einen kurzen Witz</textarea>
+        <input id="live-model" placeholder="Modell (optional)" value="">
+        <button class="btn-success" onclick="runLiveTest()">🚀 Live Test</button>
+        <div class="log" id="live-output">Bereit für Live-Test...</div>
+      </div>
+
+      <!-- Debug Logs -->
+      <div class="card">
+        <h2>📋 Debug Logs</h2>
+        <button class="btn-secondary" onclick="clearLogs()">🗑️ Clear</button>
+        <div class="log" id="debug-log">Debug-Logs erscheinen hier...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let token = '';
+    
+    function log(message) {
+      const logDiv = document.getElementById('debug-log');
+      const timestamp = new Date().toLocaleTimeString();
+      logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(message);
+    }
+
+    function clearLogs() {
+      document.getElementById('debug-log').innerHTML = '';
+      document.getElementById('live-output').innerHTML = 'Bereit für Live-Test...';
+    }
+
+    function updateStatus(elementId, text, type) {
+      const element = document.getElementById(elementId);
+      element.textContent = text;
+      element.className = `status ${type}`;
+    }
+
+    async function checkServices() {
+      log('🔍 Prüfe Services...');
+      
+      // PocketBase
+      try {
+        const res = await fetch('http://127.0.0.1:8090/test');
+        if (res.ok) {
+          const data = await res.json();
+          updateStatus('pocketbase-status', 'PocketBase: ✅ OK - ' + data.message, 'ok');
+          log('✅ PocketBase Hook funktioniert');
+        } else {
+          updateStatus('pocketbase-status', 'PocketBase: ❌ Hook Error', 'error');
+          log('❌ PocketBase Hook Error: ' + res.status);
+        }
+      } catch (e) {
+        updateStatus('pocketbase-status', 'PocketBase: ❌ Offline', 'error');
+        log('❌ PocketBase nicht erreichbar: ' + e.message);
+      }
+
+      // OpenCode Service via PocketBase Proxy
+      try {
+        const res = await fetch('http://127.0.0.1:8090/opencode/health');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.service === 'ok') {
+            updateStatus('opencode-status', 'OpenCode Service: ✅ OK', 'ok');
+            log('✅ OpenCode Service läuft auf Port ' + data.details.port);
+          } else {
+            updateStatus('opencode-status', 'OpenCode Service: ❌ Error', 'error');
+            log('❌ OpenCode Service Error: ' + data.error);
+          }
+        } else {
+          updateStatus('opencode-status', 'OpenCode Service: ❌ Error', 'error');
+        }
+      } catch (e) {
+        updateStatus('opencode-status', 'OpenCode Service: ❌ Offline', 'error');
+        log('❌ OpenCode Service nicht erreichbar: ' + e.message);
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      log(`🔐 Login Versuch: ${email}`);
+      
+      try {
+        const res = await fetch('http://127.0.0.1:8090/api/collections/users/auth-with-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity: email, password: password })
+        });
+        
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          updateStatus('auth-status', `✅ Eingeloggt als ${data.record.email}`, 'ok');
+          document.getElementById('token-info').innerHTML = `<small>Token: ${token.substring(0, 20)}...</small>`;
+          log('✅ Login erfolgreich');
+        } else {
+          updateStatus('auth-status', '❌ Login fehlgeschlagen', 'error');
+          log('❌ Login fehlgeschlagen: ' + JSON.stringify(data));
+        }
+      } catch (e) {
+        log('❌ Login Error: ' + e.message);
+      }
+    }
+
+    function logout() {
+      token = '';
+      updateStatus('auth-status', 'Nicht eingeloggt', 'pending');
+      document.getElementById('token-info').innerHTML = '';
+      log('👋 Ausgeloggt');
+    }
+
+    async function testHookBasic() {
+      log('🧪 Teste Basic Hook...');
+      try {
+        const res = await fetch('http://127.0.0.1:8090/test');
+        const data = await res.json();
+        document.getElementById('hook-basic-result').innerHTML = 
+          `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        log('✅ Basic Hook OK: ' + data.message);
+      } catch (e) {
+        log('❌ Basic Hook Error: ' + e.message);
+      }
+    }
+
+    async function testOpenCodeEndpoint() {
+      if (!token) {
+        log('❌ Bitte erst einloggen');
+        return;
+      }
+      
+      const prompt = document.getElementById('test-prompt').value;
+      log(`🧪 Teste OpenCode Endpoint mit: "${prompt}"`);
+      
+      try {
+        const res = await fetch(`http://127.0.0.1:8090/opencode/stream?prompt=${encodeURIComponent(prompt)}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        const data = await res.json();
+        document.getElementById('opencode-result').innerHTML = 
+          `<strong>Status: ${res.status}</strong><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        
+        if (res.ok) {
+          log('✅ OpenCode Endpoint OK');
+        } else {
+          log(`❌ OpenCode Endpoint Error ${res.status}: ${data.error || 'Unknown'}`);
+        }
+      } catch (e) {
+        log('❌ OpenCode Endpoint Error: ' + e.message);
+      }
+    }
+
+    async function testNodeService() {
+      log('🧪 Teste Node.js Service via PocketBase...');
+      try {
+        const res = await fetch('http://127.0.0.1:8090/opencode/health');
+        if (res.ok) {
+          const data = await res.json();
+          log('✅ Node.js Service via PocketBase: ' + JSON.stringify(data));
+          document.getElementById('node-result').innerHTML = '<strong>✅ Service erreichbar via Proxy</strong>';
+        } else {
+          log('❌ Node.js Service Error: ' + res.status);
+          document.getElementById('node-result').innerHTML = '<strong>❌ Service Error</strong>';
+        }
+      } catch (e) {
+        log('❌ Node.js Service Error: ' + e.message);
+        document.getElementById('node-result').innerHTML = '<strong>❌ Service nicht erreichbar</strong>';
+      }
+    }
+
+    async function runLiveTest() {
+      if (!token) {
+        log('❌ Bitte erst einloggen');
+        return;
+      }
+
+      const prompt = document.getElementById('live-prompt').value;
+      const model = document.getElementById('live-model').value;
+      const output = document.getElementById('live-output');
+      
+      output.innerHTML = '⏳ Starte Live-Test...\n';
+      log(`🚀 Live-Test mit: "${prompt}"`);
+
+      try {
+        const res = await fetch(`http://127.0.0.1:8090/opencode/stream?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}`, {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!res.ok) {
+          output.innerHTML += `❌ Error ${res.status}\n`;
+          const errorData = await res.json();
+          output.innerHTML += JSON.stringify(errorData, null, 2);
+          return;
+        }
+
+        // Streaming Response
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          output.innerHTML += chunk;
+          output.scrollTop = output.scrollHeight;
+        }
+
+        log('✅ Live-Test completed');
+      } catch (e) {
+        output.innerHTML += `❌ Error: ${e.message}\n`;
+        log('❌ Live-Test Error: ' + e.message);
+      }
+    }
+
+    // Auto-start
+    window.onload = () => {
+      log('🚀 Debug Dashboard gestartet');
+      checkServices();
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenCode Multiuser</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, textarea, button { margin: 5px; padding: 8px; }
+    textarea { width: 100%; height: 80px; }
+    #output { background: #f0f0f0; padding: 10px; min-height: 200px; overflow-y: auto; }
+    .section { margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="section">
+    <h2>🔐 Login</h2>
+    <input id="email" placeholder="E-Mail" value="test@test.com">
+    <input id="pass" type="password" placeholder="Passwort" value="test123456">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <div class="section">
+    <h2>💬 Prompt</h2>
+    <textarea id="prompt" placeholder="Dein Prompt hier..."></textarea><br>
+    <input id="model" placeholder="Modell (optional, z.B. gpt-4)">
+    <button onclick="send()">🚀 Senden</button>
+  </div>
+
+  <div class="section">
+    <h3>📡 Live-Ausgabe:</h3>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    let token = '';
+
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('pass').value;
+      
+      try {
+        const res = await fetch('http://127.0.0.1:8090/api/collections/users/auth-with-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identity: email,
+            password: password
+          })
+        });
+        
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          alert('✅ Eingeloggt als ' + data.record.email);
+        } else {
+          alert('❌ Login fehlgeschlagen');
+        }
+      } catch (error) {
+        alert('❌ Fehler: ' + error.message);
+      }
+    }
+
+    async function send() {
+      if (!token) {
+        alert('Bitte erst einloggen!');
+        return;
+      }
+
+      const prompt = document.getElementById('prompt').value;
+      const model = document.getElementById('model').value;
+      const output = document.getElementById('output');
+      
+      if (!prompt.trim()) {
+        alert('Prompt eingeben!');
+        return;
+      }
+
+      output.textContent = '⏳ läuft...\n';
+
+      try {
+        const res = await fetch(`http://127.0.0.1:8090/opencode/stream?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}`, {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          output.textContent += decoder.decode(value);
+          output.scrollTop = output.scrollHeight;
+        }
+      } catch (error) {
+        output.textContent += '\n❌ Fehler: ' + error.message;
+      }
+    }
+  </script>
+</body>
+</html>
