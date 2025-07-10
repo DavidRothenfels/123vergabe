@@ -20,13 +20,13 @@ echo "✅ PocketBase reachable at: $POCKETBASE_URL"
 # Create admin superuser via API call to the hook
 echo "👤 Setting up admin user..."
 
-# Trigger the user setup hook
-RESPONSE=$(curl -s -X GET "$POCKETBASE_URL/api/health")
+# Trigger the user setup endpoint
+echo "🔧 Triggering user setup..."
+SETUP_RESPONSE=$(curl -s -X GET "$POCKETBASE_URL/setup-users")
+echo "Setup response: $SETUP_RESPONSE"
+
 if [ $? -eq 0 ]; then
-    echo "✅ PocketBase is responding"
-    
-    # Wait a moment for hooks to process
-    sleep 3
+    echo "✅ User setup endpoint called"
     
     # Test admin login
     ADMIN_TEST=$(curl -s -X POST "$POCKETBASE_URL/api/collections/_superusers/auth-with-password" \

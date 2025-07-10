@@ -1,30 +1,36 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Setup script that runs on bootstrap to create admin and test users
-onBootstrap((e) => {
-  e.next() // CRITICAL: Must be called
+// Create users via a simple HTTP endpoint that can be called once
+routerAdd("GET", "/setup-users", (c) => {
+  console.log("🔧 User setup endpoint called...")
   
-  // Wait a moment for the system to be fully ready
-  setTimeout(() => {
-    setupUsers()
-  }, 2000)
-})
-
-function setupUsers() {
-  console.log("🔧 Setting up default users...")
+  const results = []
   
   try {
     // Create admin superuser
-    createAdminUser()
+    const adminResult = createAdminUser()
+    results.push(adminResult)
     
     // Create test user for dashboard
-    createTestUser()
+    const userResult = createTestUser()
+    results.push(userResult)
     
-    console.log("✅ User setup completed")
+    console.log("✅ User setup completed via endpoint")
+    
+    return c.json(200, {
+      success: true,
+      message: "User setup completed",
+      results: results
+    })
+    
   } catch (error) {
     console.error("❌ User setup failed:", error)
+    return c.json(500, {
+      success: false,
+      error: error.message
+    })
   }
-}
+})
 
 function createAdminUser() {
   try {
@@ -35,7 +41,7 @@ function createAdminUser() {
       const existingAdmin = $app.dao().findFirstRecordByFilter("_superusers", "email = 'admin@vergabe.de'")
       if (existingAdmin) {
         console.log("✅ Admin user already exists")
-        return
+        return { type: "admin", status: "exists", email: "admin@vergabe.de" }
       }
     } catch (e) {
       // Admin doesn't exist, continue with creation
@@ -50,9 +56,11 @@ function createAdminUser() {
     
     $app.dao().saveRecord(admin)
     console.log("✅ Created admin user: admin@vergabe.de / admin123456")
+    return { type: "admin", status: "created", email: "admin@vergabe.de" }
     
   } catch (error) {
     console.error("❌ Failed to create admin user:", error)
+    return { type: "admin", status: "error", error: error.message }
   }
 }
 
@@ -65,7 +73,7 @@ function createTestUser() {
       const existingUser = $app.dao().findFirstRecordByFilter("users", "email = 'test@vergabe.de'")
       if (existingUser) {
         console.log("✅ Test user already exists")
-        return
+        return { type: "user", status: "exists", email: "test@vergabe.de" }
       }
     } catch (e) {
       // User doesn't exist, continue with creation
@@ -82,8 +90,10 @@ function createTestUser() {
     
     $app.dao().saveRecord(user)
     console.log("✅ Created test user: test@vergabe.de / test123456")
+    return { type: "user", status: "created", email: "test@vergabe.de" }
     
   } catch (error) {
     console.error("❌ Failed to create test user:", error)
+    return { type: "user", status: "error", error: error.message }
   }
 }
