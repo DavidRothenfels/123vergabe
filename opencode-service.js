@@ -65,7 +65,7 @@ async function getUserApiKey(userId, authenticatedUserId = null) {
 }
 
 app.get('/opencode/stream', async (req, res) => {
-  const { prompt, model, userId, userKey, recordId } = req.query;
+  const { prompt, model, userId, userKey, recordId, projectId } = req.query;
 
   if (!prompt || !userId) {
     return res.status(400).json({ error: 'Prompt und userId erforderlich' });
@@ -161,7 +161,21 @@ app.get('/opencode/stream', async (req, res) => {
     fs.rmSync(tmpHome, { recursive: true, force: true });
 
     // Ergebnis in PocketBase DB speichern
-    if (recordId) {
+    if (recordId && projectId) {
+      // Automatisch als Dokument speichern wenn projectId vorhanden
+      const docTitle = `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`;
+      
+      db.run(
+        `INSERT INTO documents (title, content, project_id, user_id, document_type, generated_by_ai, created, updated) 
+         VALUES (?, ?, ?, ?, 'leistungsbeschreibung', 1, datetime('now'), datetime('now'))`,
+        [docTitle, fullOutput.trim(), projectId, userId],
+        (err) => {
+          if (err) console.log('DB Document Insert Error:', err);
+          else console.log(`💾 Saved document for project ${projectId}`);
+        }
+      );
+    } else if (recordId) {
+      // Fallback: Altes System für prompts
       db.run(
         `UPDATE prompts SET result = ? WHERE id = ?`,
         [fullOutput.trim(), recordId],
