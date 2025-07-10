@@ -2,10 +2,10 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ master, main, dashboard-system ]
+    branches: [ master, main ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ master, main, dashboard-system ]
+    branches: [ master, main ]
 
 env:
   REGISTRY: ghcr.io
@@ -75,7 +75,7 @@ jobs:
           -p 8090:8090 \
           -p 3001:3001 \
           -e OPENAI_API_KEY="test-key" \
-          ghcr.io/davidrothenfels/cliopencode:${{ github.ref_name }})
+          ghcr.io/davidrothenfels/cliopencode:master)
         
         echo "Container started with ID: $CONTAINER_ID"
         
@@ -143,7 +143,7 @@ jobs:
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:master
         format: 'sarif'
         output: 'trivy-results.sarif'
 
