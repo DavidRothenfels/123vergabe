@@ -8,9 +8,19 @@ echo "📊 Using PM2 for process management"
 mkdir -p pb_logs
 
 # Export environment variables
-export OPENAI_API_KEY="${OPENAI_API_KEY:-your-openai-api-key-here}"
 export NODE_ENV="production"
 export PORT="3001"
+
+# Validate OPENAI_API_KEY
+if [[ -z "$OPENAI_API_KEY" || "$OPENAI_API_KEY" == "your-openai-api-key-here" || "$OPENAI_API_KEY" == "REPLACE_WITH_YOUR_OPENAI_API_KEY" ]]; then
+    echo "⚠️  WARNING: No valid OPENAI_API_KEY provided"
+    echo "   Service will start but OpenAI features may not work"
+    echo "   Set OPENAI_API_KEY environment variable for full functionality"
+    # Set a recognizable placeholder
+    export OPENAI_API_KEY="DOCKER_PLACEHOLDER_KEY"
+else
+    echo "✅ Using provided OPENAI_API_KEY: ${OPENAI_API_KEY:0:8}..."
+fi
 
 # Start PocketBase in background
 echo "🔧 Starting PocketBase v0.28.4..."

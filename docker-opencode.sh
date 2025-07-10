@@ -51,11 +51,14 @@ if [[ -z "$PROMPT" ]]; then
 fi
 
 # Check for API key
-if [[ -z "$OPENAI_API_KEY" ]]; then
-    echo "❌ Error: OPENAI_API_KEY environment variable not set"
-    echo "Please set your OpenAI API key:"
-    echo "export OPENAI_API_KEY='your-api-key-here'"
-    exit 1
+if [[ -z "$OPENAI_API_KEY" || "$OPENAI_API_KEY" == "DOCKER_PLACEHOLDER_KEY" || "$OPENAI_API_KEY" == "your-openai-api-key-here" ]]; then
+    echo "❌ Error: No valid OPENAI_API_KEY available"
+    echo "Please set your OpenAI API key via environment variable or through the dashboard"
+    echo "This is a demo response for Docker deployment without valid API key."
+    echo ""
+    echo "Demo response for prompt: '$PROMPT'"
+    echo "This would normally be processed by OpenAI's API with a valid API key."
+    exit 0
 fi
 
 # Create OpenAI API request
