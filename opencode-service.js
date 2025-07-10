@@ -36,14 +36,8 @@ async function getUserApiKey(userId, authenticatedUserId = null) {
       return null;
     }
     
-    // Temporäre Lösung für bekannten User (bis DB-Zugriff stabil läuft)
-    if (userId === '8po2u9djiyixei1') {
-      const apiKey = process.env.OPENAI_API_KEY || 'your-openai-api-key-here';
-      if (apiKey && apiKey !== 'your-openai-api-key-here') {
-        console.log(`🔑 Authorized access: Using API key for user ${userId}: ${apiKey.substring(0, 8)}...`);
-        return apiKey;
-      }
-    }
+    // SECURITY: No hardcoded fallbacks for specific users
+    // All users must store their own API keys in the database
     
     // Datenbank-Zugriff mit Sicherheitsprüfung für andere User
     return new Promise((resolve, reject) => {

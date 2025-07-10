@@ -609,13 +609,33 @@
       const tokenPayload = JSON.parse(atob(token.split('.')[1]));
       const userId = tokenPayload.id;
 
-      // We know the API key is stored for this user (temporary workaround)
-      if (userId === '8po2u9djiyixei1') {
-        document.getElementById('api-key-status').innerHTML = '🔑 Key: sk-mdL5U...NCHym (gespeichert)';
-        log('✅ API Key gefunden (aus Datenbank)');
-      } else {
-        document.getElementById('api-key-status').innerHTML = '⚠️ Kein API Key gespeichert';
-        log('⚠️ Kein API Key für diesen User gefunden');
+      // SECURITY: No hardcoded API keys or user-specific fallbacks
+      // All users must properly save their API keys via the interface
+      try {
+        const res = await fetch(`http://127.0.0.1:8090/opencode/load-key?userId=${userId}`, {
+          method: 'GET',
+          headers: { 
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json' 
+          }
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          if (result.key) {
+            document.getElementById('api-key-status').innerHTML = `🔑 Key: ${result.key.substring(0, 8)}... (gespeichert)`;
+            log('✅ API Key gefunden (aus Datenbank)');
+          } else {
+            document.getElementById('api-key-status').innerHTML = '⚠️ Kein API Key gespeichert';
+            log('⚠️ Kein API Key für diesen User gefunden');
+          }
+        } else {
+          document.getElementById('api-key-status').innerHTML = '❌ Fehler beim Laden';
+          log('❌ Fehler beim Laden des API Keys');
+        }
+      } catch (e) {
+        document.getElementById('api-key-status').innerHTML = '❌ Verbindungsfehler';
+        log('❌ API Key Load Error: ' + e.message);
       }
     }
 
