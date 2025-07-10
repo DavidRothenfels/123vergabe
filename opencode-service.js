@@ -21,6 +21,29 @@ app.use(express.json());
 // PocketBase DB für Updates
 const db = new sqlite3.Database('./pb_data/data.db');
 
+// Function to get user's API key from PocketBase
+async function getUserApiKey(userId) {
+  return new Promise((resolve, reject) => {
+    // Query apikeys collection for user's key (get the latest one)
+    db.get(
+      `SELECT key FROM apikeys WHERE user = ? ORDER BY updated DESC LIMIT 1`,
+      [userId],
+      (err, row) => {
+        if (err) {
+          console.log(`❌ DB Error getting API key for user ${userId}:`, err);
+          reject(err);
+        } else if (row && row.key) {
+          console.log(`🔑 Found API key for user ${userId}: ${row.key.substring(0, 8)}...`);
+          resolve(row.key);
+        } else {
+          console.log(`⚠️ No API key found for user ${userId}`);
+          resolve(null);
+        }
+      }
+    );
+  });
+}
+
 app.get('/opencode/stream', async (req, res) => {
   const { prompt, model, userId, userKey, recordId } = req.query;
 
@@ -30,43 +53,35 @@ app.get('/opencode/stream', async (req, res) => {
 
   console.log(`🎯 OpenCode Request: User ${userId}, Prompt: "${prompt.substring(0, 50)}..."`);
 
+  // Get API key: userKey > PocketBase > Environment
+  let apiKey = userKey;
+  
+  if (!apiKey && userId !== 'anonymous') {
+    try {
+      apiKey = await getUserApiKey(userId);
+    } catch (error) {
+      console.log(`❌ Error fetching user API key:`, error);
+    }
+  }
+  
+  if (!apiKey) {
+    apiKey = process.env.OPENAI_API_KEY;
+  }
+
   // Setup: isoliertes Verzeichnis pro User
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), `oc-${userId}-`));
   const env = {
     ...process.env,
     HOME: tmpHome,
-    OPENAI_API_KEY: userKey || process.env.OPENAI_API_KEY || 'REPLACE_WITH_YOUR_OPENAI_API_KEY',
+    OPENAI_API_KEY: apiKey,
   };
 
-  // Demo-Modus nur wenn kein Key verfügbar
-  if (false) { // Deaktiviert da wir jetzt einen echten Key haben
-    console.log(`🎮 DEMO MODE: User ${userId}, Prompt: "${prompt}"`);
-    
-    res.write(`🎮 DEMO MODE - OpenCode Multiuser\n`);
-    res.write(`👤 User: ${userId}\n`);
-    res.write(`💬 Prompt: "${prompt}"\n`);
-    res.write(`🤖 Model: ${model || 'openai/gpt-4o-mini'}\n\n`);
-    res.write(`📝 Simulierte Antwort:\n`);
-    res.write(`Das ist eine Demo-Antwort für den Prompt "${prompt}".\n`);
-    res.write(`\nIn der echten Version würde hier OpenCode mit einem`);
-    res.write(` echten OpenAI API-Key antworten.\n\n`);
-    res.write(`✅ Demo completed!\n`);
-    
-    // DB Update simulieren
-    if (recordId) {
-      const demoResult = `Demo: "${prompt}" -> Simulierte Antwort`;
-      db.run(
-        `UPDATE prompts SET result = ? WHERE id = ?`,
-        [demoResult, recordId],
-        (err) => {
-          if (err) console.log('DB Update Error:', err);
-          else console.log(`💾 Demo result saved for record ${recordId}`);
-        }
-      );
-    }
-    
-    res.end(`\n[✔ Demo Mode - User ${userId} fertig!]`);
-    return;
+  // Check for API key
+  if (!env.OPENAI_API_KEY || env.OPENAI_API_KEY === 'REPLACE_WITH_YOUR_OPENAI_API_KEY' || env.OPENAI_API_KEY === 'your-openai-api-key-here') {
+    console.log(`❌ User ${userId}: No valid API key available`);
+    return res.status(400).json({ 
+      error: 'OpenAI API key required. Please add your API key in the dashboard or set OPENAI_API_KEY environment variable.' 
+    });
   }
 
   // OpenCode args für headless mode
@@ -134,6 +149,78 @@ app.get('/opencode/stream', async (req, res) => {
     res.write(`\n[ERROR] ${error.message}`);
     res.end();
   });
+});
+
+// API Key Save Endpoint
+app.post('/save-key', async (req, res) => {
+  const { userId, apiKey } = req.query;
+  
+  if (!userId || !apiKey) {
+    return res.status(400).json({ error: 'userId and apiKey are required' });
+  }
+  
+  console.log(`🔑 Saving API key for user ${userId}`);
+  
+  try {
+    // Check if user already has an API key
+    const existing = await new Promise((resolve, reject) => {
+      db.get(`SELECT id FROM apikeys WHERE user = ? LIMIT 1`, [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (existing) {
+      // Update existing
+      await new Promise((resolve, reject) => {
+        db.run(`UPDATE apikeys SET key = ?, updated = datetime('now') WHERE user = ?`, [apiKey, userId], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      console.log(`✅ Updated API key for user ${userId}`);
+    } else {
+      // Insert new
+      await new Promise((resolve, reject) => {
+        db.run(`INSERT INTO apikeys (user, key, created, updated) VALUES (?, ?, datetime('now'), datetime('now'))`, [userId, apiKey], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      console.log(`✅ Inserted new API key for user ${userId}`);
+    }
+    
+    res.json({ message: 'API key saved successfully', userId: userId });
+  } catch (error) {
+    console.log(`❌ Error saving API key:`, error);
+    res.status(500).json({ error: 'Failed to save API key' });
+  }
+});
+
+// API Key Load Endpoint
+app.get('/load-key', async (req, res) => {
+  const { userId } = req.query;
+  
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+  
+  console.log(`🔍 Loading API key for user ${userId}`);
+  
+  try {
+    const apiKey = await getUserApiKey(userId);
+    
+    if (apiKey) {
+      console.log(`✅ Found API key for user ${userId}`);
+      res.json({ key: apiKey, userId: userId });
+    } else {
+      console.log(`⚠️ No API key found for user ${userId}`);
+      res.json({ key: null, userId: userId });
+    }
+  } catch (error) {
+    console.log(`❌ Error loading API key:`, error);
+    res.status(500).json({ error: 'Failed to load API key' });
+  }
 });
 
 // Health Check mit CORS Headers

@@ -2,12 +2,19 @@
 
 ## Versionen
 nutze pocketbase v0.28.4 //
-nutze 
-  - getString → get
-  - $app.dao()
-  - findFirstRecordByData → findFirstRecordByFilter
-  -  onRecordCreate((e) => { ... e.next() })
-  - Collection Rules: Durch Migration für authentifizierte Benutzer geöffnet
+PocketBase v0.28.4 korrekte APIs:
+
+  1. ✅ $app.dao() - Datenbankzugriff
+  2. ✅ onRecordCreate((e) => { ... e.next() }) - Event Hooks
+  3. ✅ Collection Rules - Migration-basierte Authentifizierung
+Problem: token.split('.')[1] lieferte nicht die User ID
+Lösung: Korrektes JWT Parsing:
+const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+const userId = tokenPayload.id;
+  - user field: relation to users collection with maxSelect=1
+  - key field: text field, required
+  - Collection rules: @request.auth.id != '' && user = @request.auth.id
+
 openai Model: gpt-4.1-mini
 
 ## Project Overview

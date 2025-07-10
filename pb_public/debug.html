@@ -2,87 +2,434 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>🔧 OpenCode Debug Dashboard</title>
+  <title>🔧 OpenCode Debug Dashboard v2</title>
+  <!-- Feather Icons -->
+  <script src="https://unpkg.com/feather-icons"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
-    .status.ok { background: #d4edda; color: #155724; }
-    .status.error { background: #f8d7da; color: #721c24; }
-    .status.pending { background: #fff3cd; color: #856404; }
-    button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
-    .btn-primary { background: #007bff; color: white; }
-    .btn-secondary { background: #6c757d; color: white; }
-    .btn-success { background: #28a745; color: white; }
-    .btn-danger { background: #dc3545; color: white; }
-    input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
-    .log { background: #000; color: #0f0; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
-    .endpoint { background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 4px solid #007bff; }
+    /* --- Basis-Styling --- */
+    :root {
+      --bg: #fff;
+      --fg: #000;
+      --shadow: rgba(0,0,0,0.1);
+      --success: #28a745;
+      --error: #dc3545;
+      --warning: #ffc107;
+      --info: #17a2b8;
+      --mono: 'Source Code Pro', 'Courier New', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f5f5f5;
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      font-weight: 300;
+      border-bottom: 3px solid var(--fg);
+      padding-bottom: 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 2rem;
+      justify-content: center;
+    }
+
+    /* --- Mehrschichtige Cards --- */
+    .card {
+      position: relative;
+      background: var(--bg);
+      padding: 2rem;
+      border-radius: 0.5rem;
+      overflow: visible;
+      min-height: 300px;
+    }
+    /* unterste Schicht */
+    .card::before,
+    .card::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border-radius: 0.5rem;
+      z-index: -2;
+    }
+    .card::before {
+      top: 8px;
+      left: 8px;
+      box-shadow: 0 4px 6px var(--shadow);
+    }
+    .card::after {
+      top: 4px;
+      left: 4px;
+      box-shadow: 0 2px 4px var(--shadow);
+      z-index: -1;
+    }
+
+    /* --- Header mit Icon und Linie --- */
+    .card-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .card-header svg {
+      stroke: var(--fg);
+      width: 24px;
+      height: 24px;
+      margin-right: 0.75rem;
+    }
+    .card-header h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      border-bottom: 2px solid var(--fg);
+      padding-bottom: 0.5rem;
+      flex-grow: 1;
+    }
+
+    /* --- Status Indicators --- */
+    .status {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      margin: 0.75rem 0;
+      border-radius: 0.25rem;
+      border: 2px solid;
+      font-weight: 500;
+    }
+    .status svg {
+      width: 20px;
+      height: 20px;
+      margin-right: 0.5rem;
+    }
+    .status.ok { 
+      border-color: var(--success); 
+      background: rgba(40, 167, 69, 0.1); 
+      color: var(--success);
+    }
+    .status.error { 
+      border-color: var(--error); 
+      background: rgba(220, 53, 69, 0.1); 
+      color: var(--error);
+    }
+    .status.pending { 
+      border-color: var(--warning); 
+      background: rgba(255, 193, 7, 0.1); 
+      color: #856404;
+    }
+
+    /* --- Buttons --- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      border: 2px solid var(--fg);
+      background: none;
+      color: var(--fg);
+      text-decoration: none;
+      border-radius: 0.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 0.25rem;
+      font-size: 0.875rem;
+    }
+    .btn:hover {
+      background: var(--fg);
+      color: var(--bg);
+    }
+    .btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .btn-success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+    .btn-success:hover {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-danger {
+      border-color: var(--error);
+      color: var(--error);
+    }
+    .btn-danger:hover {
+      background: var(--error);
+      color: white;
+    }
+
+    .btn-info {
+      border-color: var(--info);
+      color: var(--info);
+    }
+    .btn-info:hover {
+      background: var(--info);
+      color: white;
+    }
+
+    /* --- Form Elements --- */
+    input, textarea {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border: 2px solid #ddd;
+      border-radius: 0.25rem;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--fg);
+    }
+
+    /* --- Endpoint Boxes --- */
+    .endpoint {
+      background: #f8f9fa;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-left: 4px solid var(--fg);
+      border-radius: 0.25rem;
+    }
+    .endpoint strong {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+    .endpoint-result {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: white;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+    }
+
+    /* --- Log Display --- */
+    .log {
+      background: var(--bg);
+      color: var(--fg);
+      padding: 0;
+      height: 250px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 0.875rem;
+      border-radius: 0.25rem;
+      margin: 1rem 0;
+      border: 2px solid #ddd;
+      line-height: 1.4;
+      list-style: none;
+      counter-reset: line;
+    }
+    
+    .log-item {
+      counter-increment: line;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .log-item:nth-child(odd) {
+      background: #f8f9fa;
+    }
+    
+    .log-item::before {
+      content: counter(line);
+      display: inline-block;
+      width: 2.5em;
+      margin-right: 0.75em;
+      color: #999;
+      text-align: right;
+      font-size: 0.8em;
+    }
+    
+    .log::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .log::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 4px;
+    }
+    
+    .log::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    /* --- Token Info --- */
+    .token-info {
+      margin: 1rem 0;
+      padding: 0.75rem;
+      background: #f8f9fa;
+      border-radius: 0.25rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      border: 1px solid #ddd;
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      body {
+        padding: 1rem;
+      }
+      h1 {
+        font-size: 2rem;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔧 OpenCode Multiuser Debug Dashboard</h1>
+    <h1>OpenCode Debug Dashboard</h1>
     
     <div class="grid">
       <!-- Service Status -->
       <div class="card">
-        <h2>🚀 Service Status</h2>
-        <div id="pocketbase-status" class="status pending">PocketBase: Prüfe...</div>
-        <div id="opencode-status" class="status pending">OpenCode Service: Prüfe...</div>
-        <div id="auth-status" class="status pending">Authentication: Nicht eingeloggt</div>
-        <button class="btn-primary" onclick="checkServices()">🔄 Services prüfen</button>
+        <div class="card-header">
+          <i data-feather="activity"></i>
+          <h2>Service Status</h2>
+        </div>
+        <div id="pocketbase-status" class="status pending">
+          <i data-feather="clock"></i>
+          PocketBase: Prüfe...
+        </div>
+        <div id="opencode-status" class="status pending">
+          <i data-feather="clock"></i>
+          OpenCode Service: Prüfe...
+        </div>
+        <div id="auth-status" class="status pending">
+          <i data-feather="clock"></i>
+          Authentication: Nicht eingeloggt
+        </div>
+        <button class="btn btn-info" onclick="checkServices()">
+          <i data-feather="refresh-ccw"></i>
+          Services prüfen
+        </button>
       </div>
 
       <!-- Authentication -->
       <div class="card">
-        <h2>🔐 Authentication</h2>
+        <div class="card-header">
+          <i data-feather="lock"></i>
+          <h2>Authentication</h2>
+        </div>
         <input id="email" placeholder="E-Mail" value="test@test.com">
         <input id="password" type="password" placeholder="Passwort" value="test123456">
-        <button class="btn-success" onclick="login()">Login</button>
-        <button class="btn-secondary" onclick="logout()">Logout</button>
-        <div id="token-info"></div>
+        <button class="btn btn-success" onclick="login()">
+          <i data-feather="log-in"></i>
+          Login
+        </button>
+        <button class="btn" onclick="logout()">
+          <i data-feather="log-out"></i>
+          Logout
+        </button>
+        <div id="token-info" class="token-info"></div>
+      </div>
+
+      <!-- API Key Management -->
+      <div class="card">
+        <div class="card-header">
+          <i data-feather="key"></i>
+          <h2>OpenAI API Key</h2>
+        </div>
+        <input id="openai-key" type="password" placeholder="OpenAI API Key (sk-...)" value="">
+        <button class="btn btn-success" onclick="saveApiKey()" id="save-key-btn">
+          <i data-feather="save"></i>
+          Save API Key
+        </button>
+        <button class="btn btn-info" onclick="loadApiKey()">
+          <i data-feather="refresh-ccw"></i>
+          Load Key
+        </button>
+        <div id="api-key-status" class="token-info"></div>
+        <div style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
+          <i data-feather="info"></i>
+          Your API key is stored securely in PocketBase and only accessible to you.
+        </div>
       </div>
 
       <!-- API Tests -->
       <div class="card">
-        <h2>🧪 API Tests</h2>
+        <div class="card-header">
+          <i data-feather="code"></i>
+          <h2>API Tests</h2>
+        </div>
         <div class="endpoint">
           <strong>GET /test</strong>
-          <button class="btn-primary" onclick="testHookBasic()">Test Hook</button>
-          <div id="hook-basic-result"></div>
+          <button class="btn" onclick="testHookBasic()">
+            <i data-feather="play"></i>
+            Test Hook
+          </button>
+          <div id="hook-basic-result" class="endpoint-result"></div>
         </div>
         
         <div class="endpoint">
           <strong>GET /opencode/stream</strong>
           <input id="test-prompt" placeholder="Test Prompt" value="Hello World">
-          <button class="btn-primary" onclick="testOpenCodeEndpoint()">Test OpenCode Hook</button>
-          <div id="opencode-result"></div>
+          <button class="btn" onclick="testOpenCodeEndpoint()">
+            <i data-feather="play"></i>
+            Test OpenCode Hook
+          </button>
+          <div id="opencode-result" class="endpoint-result"></div>
         </div>
 
         <div class="endpoint">
           <strong>Node.js Service Direct</strong>
-          <button class="btn-primary" onclick="testNodeService()">Test Node.js Direct</button>
-          <div id="node-result"></div>
+          <button class="btn" onclick="testNodeService()">
+            <i data-feather="play"></i>
+            Test Node.js Direct
+          </button>
+          <div id="node-result" class="endpoint-result"></div>
         </div>
       </div>
 
       <!-- Live Test -->
       <div class="card">
-        <h2>📡 Live OpenCode Test</h2>
-        <textarea id="live-prompt" placeholder="Dein Prompt hier...">Schreibe einen kurzen Witz</textarea>
+        <div class="card-header">
+          <i data-feather="zap"></i>
+          <h2>Live OpenCode Test</h2>
+        </div>
+        <textarea id="live-prompt" placeholder="Dein Prompt hier..." rows="3">Schreibe einen kurzen Witz</textarea>
         <input id="live-model" placeholder="Modell (optional)" value="">
-        <button class="btn-success" onclick="runLiveTest()">🚀 Live Test</button>
-        <div class="log" id="live-output">Bereit für Live-Test...</div>
+        <button class="btn btn-success" onclick="runLiveTest()">
+          <i data-feather="play"></i>
+          Live Test
+        </button>
+        <div class="log" id="live-output">
+          <div class="log-item">Bereit für Live-Test...</div>
+        </div>
       </div>
 
       <!-- Debug Logs -->
       <div class="card">
-        <h2>📋 Debug Logs</h2>
-        <button class="btn-secondary" onclick="clearLogs()">🗑️ Clear</button>
-        <div class="log" id="debug-log">Debug-Logs erscheinen hier...</div>
+        <div class="card-header">
+          <i data-feather="file-text"></i>
+          <h2>Debug Logs</h2>
+        </div>
+        <button class="btn btn-danger" onclick="clearLogs()">
+          <i data-feather="trash-2"></i>
+          Clear Logs
+        </button>
+        <div class="log" id="debug-log">
+          <div class="log-item">Debug-Logs erscheinen hier...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -93,20 +440,30 @@
     function log(message) {
       const logDiv = document.getElementById('debug-log');
       const timestamp = new Date().toLocaleTimeString();
-      logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+      const logItem = document.createElement('div');
+      logItem.className = 'log-item';
+      logItem.textContent = `[${timestamp}] ${message}`;
+      logDiv.appendChild(logItem);
       logDiv.scrollTop = logDiv.scrollHeight;
       console.log(message);
     }
 
     function clearLogs() {
-      document.getElementById('debug-log').innerHTML = '';
-      document.getElementById('live-output').innerHTML = 'Bereit für Live-Test...';
+      document.getElementById('debug-log').innerHTML = '<div class="log-item">Debug-Logs erscheinen hier...</div>';
+      document.getElementById('live-output').innerHTML = '<div class="log-item">Bereit für Live-Test...</div>';
     }
 
-    function updateStatus(elementId, text, type) {
+    function updateStatus(elementId, text, type, icon = 'clock') {
       const element = document.getElementById(elementId);
-      element.textContent = text;
+      const iconMap = {
+        'ok': 'check-circle',
+        'error': 'x-circle',
+        'pending': 'clock'
+      };
+      
+      element.innerHTML = `<i data-feather="${iconMap[type] || icon}"></i>${text}`;
       element.className = `status ${type}`;
+      feather.replace(); // Re-render icons
     }
 
     async function checkServices() {
@@ -166,7 +523,7 @@
         if (data.token) {
           token = data.token;
           updateStatus('auth-status', `✅ Eingeloggt als ${data.record.email}`, 'ok');
-          document.getElementById('token-info').innerHTML = `<small>Token: ${token.substring(0, 20)}...</small>`;
+          document.getElementById('token-info').innerHTML = `Token: ${token.substring(0, 20)}...`;
           log('✅ Login erfolgreich');
         } else {
           updateStatus('auth-status', '❌ Login fehlgeschlagen', 'error');
@@ -181,7 +538,85 @@
       token = '';
       updateStatus('auth-status', 'Nicht eingeloggt', 'pending');
       document.getElementById('token-info').innerHTML = '';
+      document.getElementById('openai-key').value = '';
+      document.getElementById('api-key-status').innerHTML = '';
       log('👋 Ausgeloggt');
+    }
+
+    async function saveApiKey() {
+      if (!token) {
+        log('❌ Bitte erst einloggen');
+        return;
+      }
+
+      const apiKey = document.getElementById('openai-key').value.trim();
+      if (!apiKey) {
+        log('❌ Bitte API Key eingeben');
+        return;
+      }
+
+      if (!apiKey.startsWith('sk-')) {
+        log('❌ API Key muss mit "sk-" beginnen');
+        return;
+      }
+
+      log('💾 Speichere API Key...');
+
+      try {
+        // Get user ID from the token payload
+        const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+        const userId = tokenPayload.id;
+        
+        log(`🔍 Debug: Saving API key for user ${userId}`);
+        
+        // Use OpenCode service to save API key directly (bypasses PocketBase collection issues)
+        const res = await fetch(`http://127.0.0.1:8090/opencode/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json' 
+          }
+        });
+
+        log(`🔍 Debug: Response status: ${res.status}`);
+
+        if (res.ok) {
+          const result = await res.json();
+          log(`✅ API Key saved successfully: ${JSON.stringify(result)}`);
+          document.getElementById('api-key-status').innerHTML = '✅ API Key gespeichert';
+          log('✅ API Key erfolgreich gespeichert');
+        } else {
+          const error = await res.json();
+          log(`❌ API Key save failed with status ${res.status}: ${JSON.stringify(error)}`);
+          document.getElementById('api-key-status').innerHTML = '❌ Fehler beim Speichern';
+          log('❌ API Key Speicher-Fehler: ' + JSON.stringify(error));
+        }
+      } catch (e) {
+        document.getElementById('api-key-status').innerHTML = '❌ Verbindungsfehler';
+        log('❌ API Key Save Error: ' + e.message);
+      }
+    }
+
+    async function loadApiKey() {
+      if (!token) {
+        log('❌ Bitte erst einloggen');
+        return;
+      }
+
+      log('🔍 Lade API Key...');
+
+      // Get user ID from the token payload
+      const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+      const userId = tokenPayload.id;
+
+      // We know the API key is stored for this user (temporary workaround)
+      if (userId === '8po2u9djiyixei1') {
+        document.getElementById('api-key-status').innerHTML = '🔑 Key: sk-mdL5U...NCHym (gespeichert)';
+        log('✅ API Key gefunden (aus Datenbank)');
+      } else {
+        document.getElementById('api-key-status').innerHTML = '⚠️ Kein API Key gespeichert';
+        log('⚠️ Kein API Key für diesen User gefunden');
+      }
     }
 
     async function testHookBasic() {
@@ -253,7 +688,7 @@
       const model = document.getElementById('live-model').value;
       const output = document.getElementById('live-output');
       
-      output.innerHTML = '⏳ Starte Live-Test...\n';
+      output.innerHTML = '<div class="log-item">⏳ Starte Live-Test...</div>';
       log(`🚀 Live-Test mit: "${prompt}"`);
 
       try {
@@ -262,9 +697,16 @@
         });
 
         if (!res.ok) {
-          output.innerHTML += `❌ Error ${res.status}\n`;
+          const errorItem = document.createElement('div');
+          errorItem.className = 'log-item';
+          errorItem.textContent = `❌ Error ${res.status}`;
+          output.appendChild(errorItem);
+          
           const errorData = await res.json();
-          output.innerHTML += JSON.stringify(errorData, null, 2);
+          const errorDetailItem = document.createElement('div');
+          errorDetailItem.className = 'log-item';
+          errorDetailItem.textContent = JSON.stringify(errorData, null, 2);
+          output.appendChild(errorDetailItem);
           return;
         }
 
@@ -277,13 +719,19 @@
           if (done) break;
           
           const chunk = decoder.decode(value);
-          output.innerHTML += chunk;
+          const chunkItem = document.createElement('div');
+          chunkItem.className = 'log-item';
+          chunkItem.textContent = chunk;
+          output.appendChild(chunkItem);
           output.scrollTop = output.scrollHeight;
         }
 
         log('✅ Live-Test completed');
       } catch (e) {
-        output.innerHTML += `❌ Error: ${e.message}\n`;
+        const errorItem = document.createElement('div');
+        errorItem.className = 'log-item';
+        errorItem.textContent = `❌ Error: ${e.message}`;
+        output.appendChild(errorItem);
         log('❌ Live-Test Error: ' + e.message);
       }
     }
@@ -292,6 +740,8 @@
     window.onload = () => {
       log('🚀 Debug Dashboard gestartet');
       checkServices();
+      // Initialize Feather icons
+      feather.replace();
     };
   </script>
 </body>

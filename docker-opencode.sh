@@ -52,40 +52,37 @@ fi
 
 # Check for API key
 if [[ -z "$OPENAI_API_KEY" ]]; then
-    echo "🎮 DEMO MODE - OpenCode Docker"
-    echo "👤 User: Docker Container"
-    echo "💬 Prompt: \"$PROMPT\""
-    echo "🤖 Model: $MODEL"
-    echo ""
-    echo "📝 Demo Response:"
-    echo "Das ist eine Docker-Demo-Antwort für den Prompt \"$PROMPT\"."
-    echo ""
-    echo "In der echten Version würde hier OpenCode mit einem echten OpenAI API-Key antworten."
-    echo ""
-    echo "✅ Demo completed!"
-    exit 0
+    echo "❌ Error: OPENAI_API_KEY environment variable not set"
+    echo "Please set your OpenAI API key:"
+    echo "export OPENAI_API_KEY='your-api-key-here'"
+    exit 1
 fi
 
-# Create a simple OpenAI API request
+# Create OpenAI API request
 echo "🚀 OpenCode Docker - Processing: \"$PROMPT\""
 
-# Use curl to call OpenAI API (simplified)
+# Use curl to call OpenAI API
 RESPONSE=$(curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":500}" \
+    -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":1000,\"temperature\":0.7}" \
     https://api.openai.com/v1/chat/completions)
 
+# Check for API errors
+if echo "$RESPONSE" | grep -q '"error"'; then
+    echo "❌ OpenAI API Error:"
+    echo "$RESPONSE" | grep -o '"message":"[^"]*"' | sed 's/"message":"//; s/"$//'
+    exit 1
+fi
+
 # Extract content from response
-CONTENT=$(echo "$RESPONSE" | grep -o '"content":"[^"]*"' | head -1 | sed 's/"content":"//; s/"$//')
+CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
 
 if [[ -n "$CONTENT" ]]; then
     echo "$CONTENT"
 else
-    echo "🎭 Mock OpenCode Response:"
-    echo "Here's a simulated AI response for: \"$PROMPT\""
-    echo ""
-    echo "This is a Docker container demonstration."
-    echo "OpenCode would normally process this request with advanced AI capabilities."
+    echo "❌ Error: Failed to extract content from OpenAI response"
+    echo "Response: $RESPONSE"
+    exit 1
 fi
 
 echo ""
