@@ -13,8 +13,7 @@ module.exports = {
       time: true,
       env: {
         NODE_ENV: 'production',
-        PORT: 3001,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'your-openai-api-key-here'
+        PORT: 3001
       },
       // Restart policy
       min_uptime: '10s',

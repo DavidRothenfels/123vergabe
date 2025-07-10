@@ -196,17 +196,17 @@ routerAdd("GET", "/opencode/stream", (e) => {
       console.log("🤖 Extracted model:", model);
     }
     
-    // User ID aus JWT Token extrahieren
+    // User ID aus authentifiziertem User extrahieren
     try {
-      const authHeader = e.request.header.get("authorization") || e.request.header.get("Authorization");
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.substring(7);
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        userId = payload.id;
-        console.log("👤 Extracted userId from token:", userId);
+      // PocketBase bietet direkten Zugriff auf authentifizierten User
+      if (e.auth && e.auth.id) {
+        userId = e.auth.id;
+        console.log("👤 Extracted userId from auth context:", userId);
+      } else {
+        console.log("⚠️ No authenticated user found");
       }
-    } catch (tokenError) {
-      console.log("⚠️ Could not extract user from token:", tokenError.message);
+    } catch (authError) {
+      console.log("⚠️ Could not extract user from auth context:", authError.message);
     }
     
     // Fallback: User ID extrahieren (falls vorhanden)
