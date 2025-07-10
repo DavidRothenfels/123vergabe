@@ -74,8 +74,8 @@ volumes:
 - **API Base**: `http://your-domain:8090/api/`
 
 ### Login Credentials
-- **Test User**: `test@test.com` / `test123456`
-- **Admin**: `admin@example.com` / `admin123456`
+- **Test User**: `test@vergabe.de` / `test123456`
+- **Admin**: `admin@vergabe.de` / `admin123456`
 
 ### API Endpoints
 - **Health**: `GET /api/health`
@@ -184,9 +184,15 @@ docker exec opencode-multiuser ./pocketbase --version
 Das OpenCode Multiuser System ist erfolgreich deployed und produktionsbereit!
 
 **Nächste Schritte:**
-1. Öffne `http://your-domain:8090/_/debug.html`
-2. Login mit `test@test.com` / `test123456`
+1. Öffne `http://your-domain:8090/` (Dashboard) oder `http://your-domain:8090/debug.html` (Debug)
+2. Login mit `test@vergabe.de` / `test123456`
 3. Teste einen OpenCode Prompt
-4. Verwalte User und API Keys im Admin Interface
+4. Verwalte User und API Keys im Admin Interface (`admin@vergabe.de` / `admin123456`)
+
+**User Setup für deployed Container:**
+```bash
+# Run setup script for Docker deployment
+./setup-users-docker.sh
+```
 
 **System ist bereit für den produktiven Einsatz!** 🚀
