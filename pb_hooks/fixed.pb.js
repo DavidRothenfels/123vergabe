@@ -6,14 +6,8 @@ routerAdd("GET", "/test", (e) => {
   });
 });
 
-// Health Check for PocketBase
-routerAdd("GET", "/api/health", (e) => {
-  return e.json(200, { 
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    service: "PocketBase"
-  });
-});
+// PocketBase already has a built-in /api/health endpoint in v0.28
+// No need to create a duplicate
 
 // Health Check
 routerAdd("GET", "/opencode/health", (e) => {

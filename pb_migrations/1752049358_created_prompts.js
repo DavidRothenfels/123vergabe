@@ -1,35 +1,37 @@
 /// <reference path="../pb_data/types.d.ts" />
-migrate((db) => {
+migrate((app) => {
+  // Check if prompts collection already exists
+  let existingCollection = null;
+  try {
+    existingCollection = app.findCollectionByNameOrId("prompts");
+  } catch (e) {
+    // Collection doesn't exist, which is fine
+  }
+
+  if (existingCollection) {
+    console.log("prompts collection already exists, skipping creation");
+    return;
+  }
+
   const collection = new Collection({
-    "id": "68ac2wudjgu5us7",
-    "created": "2025-07-09 08:22:38.257Z",
-    "updated": "2025-07-09 08:22:38.257Z",
     "name": "prompts",
     "type": "base",
     "system": false,
-    "schema": [
+    "fields": [
       {
-        "system": false,
-        "id": "heqxpawu",
         "name": "text",
         "type": "text",
         "required": true,
-        "presentable": false,
-        "unique": false,
         "options": {
-          "min": null,
-          "max": null,
+          "min": 1,
+          "max": 10000,
           "pattern": ""
         }
       },
       {
-        "system": false,
-        "id": "ghdnolvl",
         "name": "result",
         "type": "text",
         "required": false,
-        "presentable": false,
-        "unique": false,
         "options": {
           "min": null,
           "max": null,
@@ -37,29 +39,19 @@ migrate((db) => {
         }
       },
       {
-        "system": false,
-        "id": "pykwekgv",
-        "name": "user",
-        "type": "relation",
+        "name": "user_id",
+        "type": "text",
         "required": true,
-        "presentable": false,
-        "unique": false,
         "options": {
-          "collectionId": "_pb_users_auth_",
-          "cascadeDelete": false,
-          "minSelect": null,
-          "maxSelect": null,
-          "displayFields": null
+          "min": 1,
+          "max": 50,
+          "pattern": ""
         }
       },
       {
-        "system": false,
-        "id": "dhc0lx56",
         "name": "model",
         "type": "text",
         "required": false,
-        "presentable": false,
-        "unique": false,
         "options": {
           "min": null,
           "max": null,
@@ -68,18 +60,20 @@ migrate((db) => {
       }
     ],
     "indexes": [],
-    "listRule": null,
-    "viewRule": null,
-    "createRule": null,
-    "updateRule": null,
-    "deleteRule": null,
-    "options": {}
+    "listRule": "@request.auth.id != '' && user_id = @request.auth.id",
+    "viewRule": "@request.auth.id != '' && user_id = @request.auth.id",
+    "createRule": "@request.auth.id != '' && user_id = @request.auth.id",
+    "updateRule": "@request.auth.id != '' && user_id = @request.auth.id",
+    "deleteRule": "@request.auth.id != '' && user_id = @request.auth.id"
   });
 
-  return Dao(db).saveCollection(collection);
-}, (db) => {
-  const dao = new Dao(db);
-  const collection = dao.findCollectionByNameOrId("68ac2wudjgu5us7");
-
-  return dao.deleteCollection(collection);
+  return app.save(collection);
+}, (app) => {
+  // Rollback: delete the prompts collection
+  try {
+    const collection = app.findCollectionByNameOrId("prompts");
+    return app.delete(collection);
+  } catch (e) {
+    console.log("prompts collection not found during rollback");
+  }
 })
