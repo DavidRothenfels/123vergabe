@@ -437,6 +437,13 @@
   <script>
     let token = '';
     
+    // Auto-detect base URLs based on current location
+    const baseURL = window.location.origin;
+    const pbAPI = `${baseURL}/api`;
+    const opencodeAPI = `${baseURL.replace(':8090', ':3001')}`;
+    
+    console.log('🌐 Detected URLs:', { baseURL, pbAPI, opencodeAPI });
+    
     function log(message) {
       const logDiv = document.getElementById('debug-log');
       const timestamp = new Date().toLocaleTimeString();
@@ -471,7 +478,7 @@
       
       // PocketBase
       try {
-        const res = await fetch('http://127.0.0.1:8090/test');
+        const res = await fetch(`${baseURL}/test`);
         if (res.ok) {
           const data = await res.json();
           updateStatus('pocketbase-status', 'PocketBase: ✅ OK - ' + data.message, 'ok');
@@ -487,7 +494,7 @@
 
       // OpenCode Service via PocketBase Proxy
       try {
-        const res = await fetch('http://127.0.0.1:8090/opencode/health');
+        const res = await fetch(`${baseURL}/opencode/health`);
         if (res.ok) {
           const data = await res.json();
           if (data.service === 'ok') {
@@ -513,7 +520,7 @@
       log(`🔐 Login Versuch: ${email}`);
       
       try {
-        const res = await fetch('http://127.0.0.1:8090/api/collections/users/auth-with-password', {
+        const res = await fetch(`${pbAPI}/collections/users/auth-with-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ identity: email, password: password })
@@ -570,7 +577,7 @@
         log(`🔍 Debug: Saving API key for user ${userId}`);
         
         // Use OpenCode service to save API key directly (bypasses PocketBase collection issues)
-        const res = await fetch(`http://127.0.0.1:8090/opencode/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
+        const res = await fetch(`${baseURL}/opencode/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
           method: 'POST',
           headers: { 
             'Authorization': 'Bearer ' + token,
@@ -612,7 +619,7 @@
       // SECURITY: No hardcoded API keys or user-specific fallbacks
       // All users must properly save their API keys via the interface
       try {
-        const res = await fetch(`http://127.0.0.1:8090/opencode/load-key?userId=${userId}`, {
+        const res = await fetch(`${baseURL}/opencode/load-key?userId=${userId}`, {
           method: 'GET',
           headers: { 
             'Authorization': 'Bearer ' + token,
@@ -642,7 +649,7 @@
     async function testHookBasic() {
       log('🧪 Teste Basic Hook...');
       try {
-        const res = await fetch('http://127.0.0.1:8090/test');
+        const res = await fetch(`${baseURL}/test`);
         const data = await res.json();
         document.getElementById('hook-basic-result').innerHTML = 
           `<pre>${JSON.stringify(data, null, 2)}</pre>`;
@@ -662,7 +669,7 @@
       log(`🧪 Teste OpenCode Endpoint mit: "${prompt}"`);
       
       try {
-        const res = await fetch(`http://127.0.0.1:8090/opencode/stream?prompt=${encodeURIComponent(prompt)}`, {
+        const res = await fetch(`${baseURL}/opencode/stream?prompt=${encodeURIComponent(prompt)}`, {
           headers: { 'Authorization': 'Bearer ' + token }
         });
         
@@ -683,7 +690,7 @@
     async function testNodeService() {
       log('🧪 Teste Node.js Service via PocketBase...');
       try {
-        const res = await fetch('http://127.0.0.1:8090/opencode/health');
+        const res = await fetch(`${baseURL}/opencode/health`);
         if (res.ok) {
           const data = await res.json();
           log('✅ Node.js Service via PocketBase: ' + JSON.stringify(data));
