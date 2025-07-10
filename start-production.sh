@@ -31,9 +31,32 @@ ls -la /app/pocketbase 2>/dev/null || echo "❌ PocketBase binary not found in /
 
 # Start PocketBase from the correct location
 cd /app
-./pocketbase serve --http=0.0.0.0:8090 &
+echo "🔍 Starting PocketBase with debugging..."
+echo "📂 Working directory: $(pwd)"
+echo "🔍 PocketBase binary exists: $(test -f ./pocketbase && echo "YES" || echo "NO")"
+echo "🔍 PocketBase binary permissions: $(ls -la ./pocketbase 2>/dev/null || echo "File not found")"
+
+# Create pb_data directory if it doesn't exist
+mkdir -p pb_data pb_logs
+
+# Start PocketBase with explicit output and error logging
+echo "🚀 Executing: ./pocketbase serve --http=0.0.0.0:8090"
+./pocketbase serve --http=0.0.0.0:8090 > pb_logs/pocketbase.out 2> pb_logs/pocketbase.err &
 POCKETBASE_PID=$!
 echo "📍 PocketBase PID: $POCKETBASE_PID"
+
+# Give PocketBase a moment to start
+sleep 3
+
+# Check if the process is still running
+if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
+    echo "❌ PocketBase process died immediately!"
+    echo "🔍 PocketBase STDOUT:"
+    cat pb_logs/pocketbase.out 2>/dev/null || echo "No stdout output"
+    echo "🔍 PocketBase STDERR:"
+    cat pb_logs/pocketbase.err 2>/dev/null || echo "No stderr output"
+    exit 1
+fi
 
 # Wait for PocketBase to be ready
 echo "⏳ Waiting for PocketBase to start..."
@@ -43,12 +66,24 @@ while [ $timeout -gt 0 ]; do
         echo "✅ PocketBase is ready!"
         break
     fi
+    echo "⏳ Still waiting... ($timeout seconds remaining)"
+    # Show recent logs if available
+    if [ -f pb_logs/pocketbase.err ] && [ -s pb_logs/pocketbase.err ]; then
+        echo "🔍 Recent PocketBase errors:"
+        tail -n 3 pb_logs/pocketbase.err
+    fi
     sleep 2
     timeout=$((timeout-2))
 done
 
 if [ $timeout -le 0 ]; then
-    echo "❌ PocketBase failed to start"
+    echo "❌ PocketBase failed to start within timeout"
+    echo "🔍 Final PocketBase STDOUT:"
+    cat pb_logs/pocketbase.out 2>/dev/null || echo "No stdout output"
+    echo "🔍 Final PocketBase STDERR:"
+    cat pb_logs/pocketbase.err 2>/dev/null || echo "No stderr output"
+    echo "🔍 Process status:"
+    kill -0 $POCKETBASE_PID 2>/dev/null && echo "Process still running" || echo "Process not running"
     exit 1
 fi
 
@@ -110,8 +145,9 @@ while true; do
     if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
         echo "❌ PocketBase process died! Restarting..."
         cd /app
-        ./pocketbase serve --http=0.0.0.0:8090 &
+        ./pocketbase serve --http=0.0.0.0:8090 > pb_logs/pocketbase.out 2> pb_logs/pocketbase.err &
         POCKETBASE_PID=$!
+        echo "📍 New PocketBase PID: $POCKETBASE_PID"
     fi
     
     # Check Node.js service via PM2
