@@ -24,6 +24,13 @@ fi
 
 # Start PocketBase in background
 echo "🔧 Starting PocketBase v0.28.4..."
+echo "📂 Current directory: $(pwd)"
+echo "🔍 PocketBase binary check:"
+ls -la ./pocketbase 2>/dev/null || echo "❌ PocketBase binary not found in current directory"
+ls -la /app/pocketbase 2>/dev/null || echo "❌ PocketBase binary not found in /app"
+
+# Start PocketBase from the correct location
+cd /app
 ./pocketbase serve --http=0.0.0.0:8090 &
 POCKETBASE_PID=$!
 echo "📍 PocketBase PID: $POCKETBASE_PID"
@@ -102,6 +109,7 @@ while true; do
     # Check if PocketBase is still running
     if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
         echo "❌ PocketBase process died! Restarting..."
+        cd /app
         ./pocketbase serve --http=0.0.0.0:8090 &
         POCKETBASE_PID=$!
     fi
