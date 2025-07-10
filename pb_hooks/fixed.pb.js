@@ -6,6 +6,15 @@ routerAdd("GET", "/test", (e) => {
   });
 });
 
+// Health Check for PocketBase
+routerAdd("GET", "/api/health", (e) => {
+  return e.json(200, { 
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    service: "PocketBase"
+  });
+});
+
 // Health Check
 routerAdd("GET", "/opencode/health", (e) => {
   try {
