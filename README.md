@@ -1,8 +1,8 @@
 # OpenCode Multiuser System
 
 Ein Multiuser-OpenCode-System mit PocketBase Backend, Node.js Service und HTML Frontend für kollaborative KI-Code-Generierung.
-- ✅ Login funktioniert mit test@vergabe.de / test123456
-- ✅ Admin funktioniert mit admin@vergabe.de / admin123456
+  - Demo User: test@vergabe.de / test123456
+  - Admin User: admin@vergabe.de / admin123456
   
   ## 🚀 Features
 
