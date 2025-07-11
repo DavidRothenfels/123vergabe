@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anmelden - OpenCode Multiuser System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .auth-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: var(--space-4);
+        }
+        .auth-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: var(--space-6);
+            width: 100%;
+            max-width: 400px;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--space-5);
+        }
+        .auth-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: var(--space-2);
+        }
+        .auth-subtitle {
+            color: var(--fg-secondary);
+        }
+        .form-input {
+            width: 100%;
+            padding: var(--space-3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background-color: var(--input-bg);
+            color: var(--fg);
+            font-size: 1rem;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(var(--accent), 0.1);
+        }
+        .form-actions {
+            margin-top: var(--space-4);
+        }
+        .btn-full {
+            width: 100%;
+        }
+        .auth-links {
+            text-align: center;
+            margin-top: var(--space-4);
+            font-size: 0.9375rem;
+            color: var(--fg-secondary);
+        }
+        .auth-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: var(--space-3);
+            border-radius: var(--radius-sm);
+            margin-top: var(--space-4);
+            text-align: center;
+        }
+        .success-message {
+            background-color: #d4edda;
+            color: #155724;
+            padding: var(--space-3);
+            border-radius: var(--radius-sm);
+            margin-top: var(--space-4);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1 class="auth-title">Anmelden</h1>
+                <p class="auth-subtitle">OpenCode Multiuser System</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email" class="form-label">E-Mail-Adresse</label>
+                    <input type="email" id="email" name="email" required class="form-input" placeholder="ihre.email@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Passwort</label>
+                    <input type="password" id="password" name="password" required class="form-input" placeholder="Ihr Passwort">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" id="login-btn" class="btn btn-primary btn-full">Anmelden</button>
+                </div>
+                <div id="error-message" class="error-message" style="display: none;"></div>
+                <div id="success-message" class="success-message" style="display: none;"></div>
+            </form>
+            <div class="auth-links">
+                <p>Demo-Zugang: <strong>test@vergabe.de</strong> / <strong>test123456</strong></p>
+                <p>Admin-Zugang: <strong>admin@vergabe.de</strong> / <strong>admin123456</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="lib/pocketbase.umd.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>
