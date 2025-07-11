@@ -87,6 +87,21 @@ if [ $timeout -le 0 ]; then
     exit 1
 fi
 
+# Create admin user after PocketBase is ready
+echo "👤 Creating admin user..."
+echo "📧 Email: admin@vergabe.de"
+echo "🔑 Password: admin123"
+
+# Create admin using PocketBase superuser command
+./pocketbase superuser upsert admin@vergabe.de admin123
+
+if [ $? -eq 0 ]; then
+    echo "✅ Admin user created successfully!"
+else
+    echo "❌ Failed to create admin user"
+    echo "📌 Admin creation failed - manual intervention may be needed"
+fi
+
 # Start Node.js service with PM2
 echo "🔧 Starting Node.js service with PM2..."
 pm2 start ecosystem.config.js --env production

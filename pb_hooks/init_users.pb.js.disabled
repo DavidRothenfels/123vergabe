@@ -84,18 +84,20 @@ onBootstrap((e) => {
   // Allow the bootstrap process to continue
   e.next()
   
-  // Create users after bootstrap
-  try {
-    const adminResult = createAdminUser()
-    console.log("Admin setup result:", JSON.stringify(adminResult))
-    
-    const userResult = createTestUser()
-    console.log("Test user setup result:", JSON.stringify(userResult))
-    
-    console.log("✅ Automatic user setup completed")
-  } catch (error) {
-    console.error("❌ Automatic user setup failed:", error)
-  }
+  // Use setTimeout to ensure collections are ready
+  setTimeout(() => {
+    try {
+      const adminResult = createAdminUser()
+      console.log("Admin setup result:", JSON.stringify(adminResult))
+      
+      const userResult = createTestUser()
+      console.log("Test user setup result:", JSON.stringify(userResult))
+      
+      console.log("✅ Automatic user setup completed")
+    } catch (error) {
+      console.error("❌ Automatic user setup failed:", error)
+    }
+  }, 1000)
 })
 
 // ========================================
