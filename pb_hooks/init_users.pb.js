@@ -1,60 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Automatische User-Erstellung beim Bootstrap
-onBootstrap((e) => {
-  e.next() // KRITISCH für v0.28
-  
-  console.log("🔧 Bootstrap: Starting automatic user setup...")
-  
-  try {
-    // Create admin superuser
-    const adminResult = createAdminUser()
-    console.log("Admin setup result:", adminResult)
-    
-    // Create test user for dashboard
-    const userResult = createTestUser()
-    console.log("Test user setup result:", userResult)
-    
-    console.log("✅ Automatic user setup completed")
-    
-  } catch (error) {
-    console.error("❌ Automatic user setup failed:", error)
-    // Nicht kritisch - System läuft weiter
-  }
-})
-
-// Create users via a simple HTTP endpoint that can be called manually
-routerAdd("GET", "/setup-users", (c) => {
-  console.log("🔧 User setup endpoint called...")
-  
-  const results = []
-  
-  try {
-    // Create admin superuser
-    const adminResult = createAdminUser()
-    results.push(adminResult)
-    
-    // Create test user for dashboard
-    const userResult = createTestUser()
-    results.push(userResult)
-    
-    console.log("✅ User setup completed via endpoint")
-    
-    return c.json(200, {
-      success: true,
-      message: "User setup completed",
-      results: results
-    })
-    
-  } catch (error) {
-    console.error("❌ User setup failed:", error)
-    return c.json(500, {
-      success: false,
-      error: error.message
-    })
-  }
-})
-
+// Function definitions first to avoid hoisting issues
 function createAdminUser() {
   try {
     const superusers = $app.dao().findCollectionByNameOrId("_superusers")
@@ -122,3 +68,58 @@ function createTestUser() {
     return { type: "user", status: "error", error: error.message }
   }
 }
+
+// Automatische User-Erstellung beim Bootstrap
+onBootstrap((e) => {
+  e.next() // KRITISCH für v0.28
+  
+  console.log("🔧 Bootstrap: Starting automatic user setup...")
+  
+  try {
+    // Create admin superuser
+    const adminResult = createAdminUser()
+    console.log("Admin setup result:", adminResult)
+    
+    // Create test user for dashboard
+    const userResult = createTestUser()
+    console.log("Test user setup result:", userResult)
+    
+    console.log("✅ Automatic user setup completed")
+    
+  } catch (error) {
+    console.error("❌ Automatic user setup failed:", error)
+    // Nicht kritisch - System läuft weiter
+  }
+})
+
+// Create users via a simple HTTP endpoint that can be called manually
+routerAdd("GET", "/setup-users", (c) => {
+  console.log("🔧 User setup endpoint called...")
+  
+  const results = []
+  
+  try {
+    // Create admin superuser
+    const adminResult = createAdminUser()
+    results.push(adminResult)
+    
+    // Create test user for dashboard
+    const userResult = createTestUser()
+    results.push(userResult)
+    
+    console.log("✅ User setup completed via endpoint")
+    
+    return c.json(200, {
+      success: true,
+      message: "User setup completed",
+      results: results
+    })
+    
+  } catch (error) {
+    console.error("❌ User setup failed:", error)
+    return c.json(500, {
+      success: false,
+      error: error.message
+    })
+  }
+})
