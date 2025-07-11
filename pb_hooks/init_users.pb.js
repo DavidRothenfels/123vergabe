@@ -1,6 +1,31 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Create users via a simple HTTP endpoint that can be called once
+// Automatische User-Erstellung beim Bootstrap
+onBootstrap((e) => {
+  e.next() // KRITISCH für v0.28
+  
+  console.log("🔧 Bootstrap: Starting automatic user setup...")
+  
+  // Kurze Verzögerung um sicherzustellen, dass alle Collections bereit sind
+  setTimeout(() => {
+    try {
+      // Create admin superuser
+      const adminResult = createAdminUser()
+      console.log("Admin setup result:", adminResult)
+      
+      // Create test user for dashboard
+      const userResult = createTestUser()
+      console.log("Test user setup result:", userResult)
+      
+      console.log("✅ Automatic user setup completed")
+      
+    } catch (error) {
+      console.error("❌ Automatic user setup failed:", error)
+    }
+  }, 2000) // 2 Sekunden warten
+})
+
+// Create users via a simple HTTP endpoint that can be called manually
 routerAdd("GET", "/setup-users", (c) => {
   console.log("🔧 User setup endpoint called...")
   
