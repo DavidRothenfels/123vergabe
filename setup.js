@@ -55,7 +55,7 @@ db.run(`
   INSERT OR REPLACE INTO users (id, email, username, passwordHash, tokenKey, verified, created, updated)
   VALUES (
     'user123',
-    'test@test.com',
+    'test@vergabe.de',
     'testuser',
     '$2a$10$vI1.k9Z8qjRvELrxm/zEKOUVf7Yb7.YiTVo8XqJvSzjdN5oY2zxZm',
     'user_token_key_123',

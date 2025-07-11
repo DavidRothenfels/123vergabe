@@ -7,13 +7,13 @@ PocketBase v0.28.4 korrekte APIs:
   1. ✅ $app.dao() - Datenbankzugriff
   2. ✅ onRecordCreate((e) => { ... e.next() }) - Event Hooks
   3. ✅ Collection Rules - Migration-basierte Authentifizierung
-Problem: token.split('.')[1] lieferte nicht die User ID
-Lösung: Korrektes JWT Parsing:
+Problem: token.split('.')[1] lieferte nicht die User ID, Lösung: Korrektes JWT Parsing:
 const tokenPayload = JSON.parse(atob(token.split('.')[1]));
 const userId = tokenPayload.id;
   - user field: relation to users collection with maxSelect=1
   - key field: text field, required
   - Collection rules: @request.auth.id != '' && user = @request.auth.id
+PocketBase JavaScript-Hooks haben keine Browser/Node.js APIs: setTimeout/setInterval, fetch, Promise/async-await, DOM APIs, Node.js modules - ES5-Grundfunktionen und PocketBase-spezifische APIs sind verfügbar
 
 openai Model: gpt-4.1-mini
 

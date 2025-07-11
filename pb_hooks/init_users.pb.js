@@ -1,6 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Function definitions first to avoid hoisting issues
+// ========================================
+// FUNCTION DEFINITIONS (MUST BE FIRST)
+// ========================================
+
+// Admin creation function
 function createAdminUser() {
   try {
     const superusers = $app.dao().findCollectionByNameOrId("_superusers")
@@ -33,6 +37,7 @@ function createAdminUser() {
   }
 }
 
+// Test user creation function
 function createTestUser() {
   try {
     const users = $app.dao().findCollectionByNameOrId("users")
@@ -69,30 +74,34 @@ function createTestUser() {
   }
 }
 
-// Automatische User-Erstellung beim Bootstrap
+// ========================================
+// BOOTSTRAP HOOK - AUTOMATIC USER CREATION
+// ========================================
+
 onBootstrap((e) => {
-  e.next() // KRITISCH für v0.28
-  
   console.log("🔧 Bootstrap: Starting automatic user setup...")
   
+  // Allow the bootstrap process to continue
+  e.next()
+  
+  // Create users after bootstrap
   try {
-    // Create admin superuser
     const adminResult = createAdminUser()
-    console.log("Admin setup result:", adminResult)
+    console.log("Admin setup result:", JSON.stringify(adminResult))
     
-    // Create test user for dashboard
     const userResult = createTestUser()
-    console.log("Test user setup result:", userResult)
+    console.log("Test user setup result:", JSON.stringify(userResult))
     
     console.log("✅ Automatic user setup completed")
-    
   } catch (error) {
     console.error("❌ Automatic user setup failed:", error)
-    // Nicht kritisch - System läuft weiter
   }
 })
 
-// Create users via a simple HTTP endpoint that can be called manually
+// ========================================
+// MANUAL USER CREATION ENDPOINT
+// ========================================
+
 routerAdd("GET", "/setup-users", (c) => {
   console.log("🔧 User setup endpoint called...")
   

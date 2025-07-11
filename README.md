@@ -1,8 +1,10 @@
 # OpenCode Multiuser System
 
 Ein Multiuser-OpenCode-System mit PocketBase Backend, Node.js Service und HTML Frontend für kollaborative KI-Code-Generierung.
-
-## 🚀 Features
+- ✅ Login funktioniert mit test@vergabe.de / test123456
+- ✅ Admin funktioniert mit admin@vergabe.de / admin123456
+  
+  ## 🚀 Features
 
 - **🔐 User Authentication**: Login mit Email/Passwort über PocketBase
 - **🔑 Personal API Keys**: Jeder User kann seinen eigenen OpenAI API Key setzen
@@ -43,42 +45,46 @@ npm install
 
 2. **Environment Variables setzen**
 ```bash
-cp .env.example .env
-# Edit .env mit deinem OpenAI API Key
-echo "OPENAI_API_KEY=sk-..." > .env
+export OPENAI_API_KEY="sk-..."
 ```
 
-3. **PocketBase starten**
+3. **System starten**
 ```bash
-./pocketbase serve
+# Komplettes System starten (empfohlen)
+./run.sh
+
+# Oder manuell:
+# ./pocketbase serve --http=127.0.0.1:8090 &
+# node opencode-service.js
 ```
 
-4. **Node.js Service starten**
+4. **User Setup** (automatisch beim Start)
 ```bash
-node opencode-service.js
+# Optional: Manuelle User-Erstellung
+./setup-users.sh
 ```
 
 ## 🎯 Erste Schritte
 
-### 1. Admin Account erstellen
+### 1. Admin Account (automatisch erstellt)
 
 Nach dem Start navigiere zu: **http://localhost:8090/_/**
 
-**Standard Admin Credentials** (beim ersten Start):
-- **Email**: `admin@example.com`
+**Standard Admin Credentials** (automatisch beim Start erstellt):
+- **Email**: `admin@vergabe.de`
 - **Password**: `admin123456`
 
-### 2. Test User Account
+### 2. Test User Account (automatisch erstellt)
 
 Das System kommt mit einem vorkonfigurierten Test User:
-- **Email**: `test@test.com`
+- **Email**: `test@vergabe.de`
 - **Password**: `test123456`
 
 ### 3. Dashboard öffnen
 
-Navigiere zu: **http://localhost:8090/_/debug.html**
+Navigiere zu: **http://localhost:8090/debug.html**
 
-1. **Login** mit den Test Credentials
+1. **Login** mit den Test Credentials (`test@vergabe.de` / `test123456`)
 2. **Service Status prüfen** - beide Services sollten grün sein
 3. **Live Test starten** - gib einen Prompt ein wie "Schreibe einen kurzen Witz"
 
@@ -256,8 +262,8 @@ Siehe [LICENSE.md](LICENSE.md) für Details.
 
 Das System ist produktionsreif und kann sofort verwendet werden:
 
-1. **Starte** das System mit Docker
-2. **Öffne** http://localhost:8090/_/debug.html
-3. **Login** mit test@test.com / test123456
+1. **Starte** das System mit `./run.sh` (lokal) oder Docker
+2. **Öffne** http://localhost:8090/debug.html
+3. **Login** mit `test@vergabe.de` / `test123456`
 4. **Teste** mit einem Prompt wie "Erstelle eine Python-Funktion für Fibonacci"
 5. **Genieße** die Live-KI-Code-Generierung!
