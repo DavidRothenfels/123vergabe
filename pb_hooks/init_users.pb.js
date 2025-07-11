@@ -70,13 +70,13 @@ function createAdminUser() {
       // Admin doesn't exist, continue with creation
     }
     
-    // Create admin user
+    // Create admin user - superusers use different approach
     const admin = new Record(superusers, {
-      "email": "admin@vergabe.de",
-      "password": "admin123456",
-      "passwordConfirm": "admin123456"
+      "email": "admin@vergabe.de"
     })
     
+    // Set password using PocketBase v0.28 method
+    admin.setPassword("admin123456")
     $app.dao().saveRecord(admin)
     console.log("✅ Created admin user: admin@vergabe.de / admin123456")
     return { type: "admin", status: "created", email: "admin@vergabe.de" }
@@ -102,15 +102,17 @@ function createTestUser() {
       // User doesn't exist, continue with creation
     }
     
-    // Create test user
+    // Create test user  
     const user = new Record(users, {
+      "username": "testuser", 
       "email": "test@vergabe.de",
-      "password": "test123456",
-      "passwordConfirm": "test123456",
+      "emailVisibility": true,
       "verified": true,
       "name": "Test User"
     })
     
+    // Set password using PocketBase v0.28 method
+    user.setPassword("test123456")
     $app.dao().saveRecord(user)
     console.log("✅ Created test user: test@vergabe.de / test123456")
     return { type: "user", status: "created", email: "test@vergabe.de" }
