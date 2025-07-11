@@ -6,23 +6,21 @@ onBootstrap((e) => {
   
   console.log("🔧 Bootstrap: Starting automatic user setup...")
   
-  // Kurze Verzögerung um sicherzustellen, dass alle Collections bereit sind
-  setTimeout(() => {
-    try {
-      // Create admin superuser
-      const adminResult = createAdminUser()
-      console.log("Admin setup result:", adminResult)
-      
-      // Create test user for dashboard
-      const userResult = createTestUser()
-      console.log("Test user setup result:", userResult)
-      
-      console.log("✅ Automatic user setup completed")
-      
-    } catch (error) {
-      console.error("❌ Automatic user setup failed:", error)
-    }
-  }, 2000) // 2 Sekunden warten
+  try {
+    // Create admin superuser
+    const adminResult = createAdminUser()
+    console.log("Admin setup result:", adminResult)
+    
+    // Create test user for dashboard
+    const userResult = createTestUser()
+    console.log("Test user setup result:", userResult)
+    
+    console.log("✅ Automatic user setup completed")
+    
+  } catch (error) {
+    console.error("❌ Automatic user setup failed:", error)
+    // Nicht kritisch - System läuft weiter
+  }
 })
 
 // Create users via a simple HTTP endpoint that can be called manually
