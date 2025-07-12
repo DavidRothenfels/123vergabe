@@ -3,8 +3,7 @@
 .env.local
 .env.production
 
-# PocketBase runtime files
-pb_data/
+# PocketBase runtime files (keep pb_data for deployment)
 pb.log
 pb_new.log
 startup.log

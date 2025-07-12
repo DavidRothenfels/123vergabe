@@ -26,7 +26,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY pocketbase ./pocketbase
 RUN chmod +x ./pocketbase
 
-# Copy PocketBase configuration and code (pb_data will be created at runtime)
+# Copy all PocketBase data (databases, storage, etc.)
+COPY pb_data/ ./pb_data/
 COPY pb_hooks/ ./pb_hooks/
 COPY pb_public/ ./pb_public/
 COPY pb_migrations/ ./pb_migrations/
