@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" fill="white" rx="4"/>
+  
+  <!-- Layers icon (similar to Feather layers icon) -->
+  <!-- Bottom layer -->
+  <path d="M16 20 L6 15 L16 10 L26 15 Z" fill="#f97316" stroke="#ea580c" stroke-width="0.5"/>
+  
+  <!-- Middle layer -->
+  <path d="M16 17 L6 12 L10 10 L16 13 L22 10 L26 12 Z" fill="#f97316" stroke="#ea580c" stroke-width="0.5"/>
+  
+  <!-- Top layer -->
+  <path d="M16 14 L6 9 L10 7 L16 10 L22 7 L26 9 Z" fill="#f97316" stroke="#ea580c" stroke-width="0.5"/>
+</svg>

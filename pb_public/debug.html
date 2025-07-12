@@ -534,6 +534,8 @@
         const data = await res.json();
         if (data.token) {
           token = data.token;
+          // Sync PocketBase SDK with the token
+          pb.authStore.save(data.token, data.record);
           updateStatus('auth-status', `✅ Eingeloggt als ${data.record.email}`, 'ok');
           document.getElementById('token-info').innerHTML = `Token: ${token.substring(0, 20)}...`;
           log('✅ Login erfolgreich');
@@ -548,6 +550,8 @@
 
     function logout() {
       token = '';
+      // Clear PocketBase SDK auth
+      pb.authStore.clear();
       updateStatus('auth-status', 'Nicht eingeloggt', 'pending');
       document.getElementById('token-info').innerHTML = '';
       document.getElementById('openai-key').value = '';
@@ -581,31 +585,22 @@
         
         log(`🔍 Debug: Saving API key for user ${userId}`);
         
-        // Use PocketBase collection directly (correct approach)
-        
-        // First deactivate all existing API keys for this user
-        const existingKeys = await pb.collection('apikeys').getFullList({
-          filter: `user_id="${userId}" && active=true`
+        // Use Node.js service instead of PocketBase SDK (more reliable)
+        const saveRes = await fetch(`${baseURL.replace(':8090', ':3001')}/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
+          method: 'POST'
         });
-
-        for (const key of existingKeys) {
-          await pb.collection('apikeys').update(key.id, { active: false });
+        
+        if (saveRes.ok) {
+          const saveData = await saveRes.json();
+          log('✅ API Key erfolgreich gespeichert via Service');
+          document.getElementById('api-key-status').innerHTML = '✅ API Key gespeichert';
+          
+          // Clear the input field
+          document.getElementById('openai-key').value = '';
+        } else {
+          const errorData = await saveRes.json();
+          throw new Error(errorData.error || 'Service Error');
         }
-
-        // Create new API key record
-        await pb.collection('apikeys').create({
-          user_id: userId,
-          provider: 'openai',
-          api_key: apiKey,
-          name: `API Key ${new Date().toLocaleDateString('de-DE')}`,
-          active: true
-        });
-
-        log('✅ API Key erfolgreich gespeichert');
-        document.getElementById('api-key-status').innerHTML = '✅ API Key gespeichert';
-        
-        // Clear the input field
-        document.getElementById('openai-key').value = '';
         
       } catch (e) {
         document.getElementById('api-key-status').innerHTML = '❌ Verbindungsfehler';
@@ -674,9 +669,9 @@
           headers: { 'Authorization': 'Bearer ' + token }
         });
         
-        const data = await res.json();
+        const data = await res.text();
         document.getElementById('opencode-result').innerHTML = 
-          `<strong>Status: ${res.status}</strong><pre>${JSON.stringify(data, null, 2)}</pre>`;
+          `<strong>Status: ${res.status}</strong><pre>${data}</pre>`;
         
         if (res.ok) {
           log('✅ OpenCode Endpoint OK');

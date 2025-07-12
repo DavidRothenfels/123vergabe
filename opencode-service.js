@@ -115,7 +115,7 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args
+  // OpenCode args - use run command with model flag
   const args = ['run'];
   
   // Model mit korrektem Format (openai/model)
@@ -168,31 +168,36 @@ app.get('/opencode/stream', async (req, res) => {
     // Cleanup
     fs.rmSync(tmpHome, { recursive: true, force: true });
 
-    // Ergebnis in PocketBase DB speichern
-    if (recordId && projectId) {
-      // Automatisch als Dokument speichern wenn projectId vorhanden
-      const docTitle = `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`;
-      
-      db.run(
-        `INSERT INTO documents (title, content, project_id, user_id, document_type, generated_by_ai, created, updated) 
-         VALUES (?, ?, ?, ?, 'leistungsbeschreibung', 1, datetime('now'), datetime('now'))`,
-        [docTitle, fullOutput.trim(), projectId, userId],
-        (err) => {
-          if (err) console.log('DB Document Insert Error:', err);
-          else console.log(`💾 Saved document for project ${projectId}`);
-        }
-      );
-    } else if (recordId) {
-      // Fallback: Create document in documents collection
-      db.run(
-        `INSERT INTO documents (id, title, content, request_id, type, created_by, created, updated) 
-         VALUES (?, ?, ?, ?, 'leistung', ?, datetime('now'), datetime('now'))`,
-        [recordId, `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`, fullOutput.trim(), recordId, userId],
-        (err) => {
-          if (err) console.log('DB Document Insert Error:', err);
-          else console.log(`💾 Saved document for record ${recordId}`);
-        }
-      );
+    // Nur speichern wenn OpenCode erfolgreich war UND Content vorhanden ist
+    if (code === 0 && fullOutput.trim() && !fullOutput.includes('[ERR]')) {
+      // Ergebnis in PocketBase DB speichern
+      if (recordId && projectId) {
+        // Automatisch als Dokument speichern wenn projectId vorhanden
+        const docTitle = `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`;
+        
+        db.run(
+          `INSERT INTO documents (title, content, project_id, user_id, document_type, generated_by_ai, created, updated) 
+           VALUES (?, ?, ?, ?, 'leistungsbeschreibung', 1, datetime('now'), datetime('now'))`,
+          [docTitle, fullOutput.trim(), projectId, userId],
+          (err) => {
+            if (err) console.log('DB Document Insert Error:', err);
+            else console.log(`💾 Saved document for project ${projectId}`);
+          }
+        );
+      } else if (recordId) {
+        // Fallback: Create document in documents collection
+        db.run(
+          `INSERT INTO documents (id, title, content, request_id, type, created_by, created, updated) 
+           VALUES (?, ?, ?, ?, 'leistung', ?, datetime('now'), datetime('now'))`,
+          [recordId, `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`, fullOutput.trim(), recordId, userId],
+          (err) => {
+            if (err) console.log('DB Document Insert Error:', err);
+            else console.log(`💾 Saved document for record ${recordId}`);
+          }
+        );
+      }
+    } else {
+      console.log(`❌ User ${userId}: Not saving document due to error (code: ${code}, hasContent: ${!!fullOutput.trim()}, hasError: ${fullOutput.includes('[ERR]')})`);
     }
 
     res.end(`\n\n[✔ User ${userId} - Fertig!]`);

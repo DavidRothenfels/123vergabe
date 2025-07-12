@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🧩 Vergabebausteine</title>
+  <title>Vergabebausteine</title>
+  <!-- Favicon -->
+  <link rel="icon" href="./assets/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="./assets/favicon-16x16.png" sizes="16x16" type="image/png">
+  <link rel="icon" href="./assets/favicon-32x32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/favicon-48x48.png">
   <!-- Feather Icons -->
   <script src="https://unpkg.com/feather-icons"></script>
   <!-- PocketBase SDK - CDN -->
@@ -309,8 +315,9 @@
     .logs {
       max-height: 200px;
       overflow-y: auto;
-      background: #6c757d;
-      color: white;
+      background: white;
+      color: black;
+      border: 1px solid #6b7280;
       padding: 1rem;
       border-radius: 0.5rem;
       font-family: var(--mono);
@@ -319,11 +326,11 @@
 
     .log-entry {
       margin-bottom: 0.5rem;
-      color: white; /* White color like time display */
+      color: black;
     }
 
     .log-timestamp {
-      color: rgba(255, 255, 255, 0.7); /* Semi-transparent white for timestamps */
+      color: #6b7280; /* Gray color for timestamps */
     }
 
     /* Notification System */
@@ -626,6 +633,10 @@
       .example-grid {
         grid-template-columns: 1fr;
       }
+
+      #mobileBackBtn {
+        display: block !important;
+      }
     }
 
     /* Example Modal */
@@ -777,9 +788,8 @@
               <button onclick="openSettingsPopup()" style="background: none; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; color: #6b7280;" title="Einstellungen">
                 <i data-feather="settings" style="width: 2rem; height: 2rem;"></i>
               </button>
-              <button class="btn btn-secondary" onclick="logout()" style="font-size: 0.875rem;" title="Abmelden">
-                <i data-feather="log-out"></i>
-                Abmelden
+              <button onclick="logout()" style="background: none; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; color: #6b7280;" title="Abmelden">
+                <i data-feather="log-out" style="width: 2rem; height: 2rem;"></i>
               </button>
             </div>
           </div>
@@ -791,8 +801,8 @@
                   <i data-feather="folder"></i>
                   <h2>Meine Projekte</h2>
                 </div>
-                <button class="btn btn-secondary" onclick="createProject()">
-                  <i data-feather="plus"></i>
+                <button onclick="createProject()" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s;">
+                  <i data-feather="plus" style="color: black;"></i>
                   Neues Projekt
                 </button>
               </div>
@@ -835,6 +845,9 @@
 
       <div class="main-content">
         <div class="header">
+          <button id="mobileBackBtn" onclick="backToProjects()" style="display: none; background: none; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; color: #6b7280;" title="Zurück zu Projekten">
+            <i data-feather="arrow-left" style="width: 1.5rem; height: 1.5rem;"></i>
+          </button>
           <div style="margin-left: auto; display: flex; align-items: center; gap: 1rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
               <i data-feather="user" style="color: var(--fg);"></i>
@@ -846,9 +859,8 @@
             <button onclick="openSettingsPopup()" style="background: none; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; color: #6b7280;" title="Einstellungen">
               <i data-feather="settings" style="width: 2rem; height: 2rem;"></i>
             </button>
-            <button class="btn btn-secondary" onclick="logout()" style="font-size: 0.875rem;" title="Abmelden">
-              <i data-feather="log-out"></i>
-              Abmelden
+            <button onclick="logout()" style="background: none; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; color: #6b7280;" title="Abmelden">
+              <i data-feather="log-out" style="width: 2rem; height: 2rem;"></i>
             </button>
           </div>
         </div>
@@ -868,8 +880,8 @@
                   <select id="promptSelect" style="flex: 1;">
                     <option value="">Dokumentenart wählen...</option>
                   </select>
-                  <button type="button" id="exampleBtn" class="btn btn-secondary" style="padding: 0.5rem; white-space: nowrap;">
-                    <i data-feather="book-open" style="width: 1rem; height: 1rem;"></i>
+                  <button type="button" id="exampleBtn" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
+                    <i data-feather="book-open" style="width: 1rem; height: 1rem; color: black;"></i>
                     Beispiele
                   </button>
                 </div>
@@ -880,8 +892,8 @@
                 <textarea id="themaInput" placeholder="Beschreiben Sie Ihr Projekt..."></textarea>
               </div>
 
-              <button class="btn-ai-generate" onclick="generateDocument()" id="generateBtn" title="Dokument generieren">
-                <i data-feather="zap"></i>
+              <button onclick="generateDocument()" id="generateBtn" title="Dokument generieren" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;">
+                <i data-feather="zap" style="color: #f97316;"></i>
               </button>
 
               <!-- Live Logs -->
@@ -917,8 +929,8 @@
                 </div>
               </div>
 
-              <button class="btn btn-secondary" onclick="copyToClipboard()" id="copyBtn" disabled style="width: 100%; font-size: 0.875rem;" title="In Zwischenablage kopieren">
-                <i data-feather="copy"></i>
+              <button onclick="copyToClipboard()" id="copyBtn" disabled style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%; font-size: 0.875rem;" title="In Zwischenablage kopieren">
+                <i data-feather="copy" style="color: black;"></i>
               </button>
             </div>
           </div>
@@ -1570,8 +1582,12 @@
         console.log('selectedPrompt:', selectedPrompt);
         console.log('Available keys:', Object.keys(selectedPrompt));
         
-        // Replace {INPUT_THEMA} placeholder in prompt
-        const finalPrompt = selectedPrompt.prompt_text.replace(/{INPUT_THEMA}/g, thema);
+        // Replace placeholders in prompt - support both {INPUT_THEMA} and {description}
+        let finalPrompt = selectedPrompt.prompt_text.replace(/{INPUT_THEMA}/g, thema);
+        finalPrompt = finalPrompt.replace(/{description}/g, thema);
+        
+        console.log('🔍 Debug: Original prompt:', selectedPrompt.prompt_text);
+        console.log('🔍 Debug: Final prompt:', finalPrompt);
         
         // Call OpenCode service - use correct model format from CLAUDE.md
         const response = await fetch(`./opencode/stream?prompt=${encodeURIComponent(finalPrompt)}&model=gpt-4.1-mini&userId=${currentUser.id}&projectId=${currentProject.id}`, {
@@ -1846,27 +1862,48 @@
           return;
         }
 
-        // Load active API key for this user
-        const apiKeys = await pb.collection('apikeys').getFullList({
-          filter: `user_id="${user.id}" && active=true`
-        });
+        console.log('🔍 Debug: Loading API key for user', user.id);
+
+        // Try to load active API key for this user
+        let apiKeys = [];
+        try {
+          apiKeys = await pb.collection('apikeys').getFullList({
+            filter: `user_id="${user.id}" && active=true`
+          });
+          console.log('🔍 Debug: Found API keys:', apiKeys);
+        } catch (collectionError) {
+          console.log('🔍 Debug: apikeys collection error:', collectionError);
+          // Collection might not exist or be accessible, try alternative approach
+          try {
+            // Try to get all records and filter manually
+            const allKeys = await pb.collection('apikeys').getFullList();
+            apiKeys = allKeys.filter(key => key.user_id === user.id && key.active === true);
+            console.log('🔍 Debug: Filtered API keys:', apiKeys);
+          } catch (altError) {
+            console.log('🔍 Debug: Alternative approach failed:', altError);
+            apiKeys = [];
+          }
+        }
 
         const apiKeyInput = document.getElementById('settingsApiKey');
         if (apiKeys.length > 0) {
           const activeKey = apiKeys[0];
+          console.log('🔍 Debug: Using API key:', activeKey);
           // Show masked key with asterisks
-          const maskedKey = 'sk-' + '*'.repeat(activeKey.api_key.length - 6) + activeKey.api_key.slice(-4);
+          const maskedKey = 'sk-' + '*'.repeat(Math.max(0, activeKey.api_key.length - 6)) + activeKey.api_key.slice(-4);
           apiKeyInput.value = maskedKey;
           apiKeyInput.dataset.originalKey = activeKey.api_key;
           apiKeyInput.dataset.isMasked = 'true';
           showSettingsStatus('API Schlüssel geladen', 'completed');
         } else {
+          console.log('🔍 Debug: No API keys found');
           apiKeyInput.value = '';
           delete apiKeyInput.dataset.originalKey;
           delete apiKeyInput.dataset.isMasked;
           showSettingsStatus('Kein API Schlüssel gespeichert', 'warning');
         }
       } catch (error) {
+        console.error('🔍 Debug: LoadCurrentApiKey error:', error);
         showSettingsStatus('Fehler beim Laden: ' + error.message, 'error');
         log('❌ API Schlüssel Ladefehler: ' + error.message);
       }
@@ -1941,38 +1978,51 @@
           return;
         }
 
-        // Deactivate all other API keys for this user
-        const existingKeys = await pb.collection('apikeys').getFullList({
-          filter: `user_id="${user.id}" && active=true`
-        });
-
-        for (const key of existingKeys) {
-          await pb.collection('apikeys').update(key.id, { active: false });
-        }
-
-        // Create new API key
-        const apiKeyData = {
-          user_id: user.id,
-          provider: 'openai',
-          api_key: apiKey,
-          name: `API Key ${new Date().toLocaleDateString('de-DE')}`,
-          active: true
-        };
-        
         console.log('🔍 Debug: Saving API key for user', user.id);
-        console.log('🔍 Debug: API key data:', apiKeyData);
         
-        // Use OpenCode service endpoint to save API key (workaround for PocketBase validation issue)
-        const saveResponse = await fetch(`http://localhost:3001/save-key?userId=${encodeURIComponent(user.id)}&apiKey=${encodeURIComponent(apiKey)}`, {
-          method: 'POST'
-        });
-        
-        if (!saveResponse.ok) {
-          throw new Error(`Save failed: ${saveResponse.statusText}`);
+        try {
+          // First try to deactivate existing keys
+          try {
+            const existingKeys = await pb.collection('apikeys').getFullList({
+              filter: `user_id="${user.id}" && active=true`
+            });
+
+            for (const key of existingKeys) {
+              await pb.collection('apikeys').update(key.id, { active: false });
+            }
+          } catch (existingError) {
+            console.log('🔍 Debug: Could not deactivate existing keys:', existingError);
+          }
+
+          // Create new API key directly via PocketBase
+          const apiKeyData = {
+            user_id: user.id,
+            provider: 'openai',
+            api_key: apiKey,
+            name: `API Key ${new Date().toLocaleDateString('de-DE')}`,
+            active: true
+          };
+          
+          console.log('🔍 Debug: API key data:', apiKeyData);
+          
+          const newRecord = await pb.collection('apikeys').create(apiKeyData);
+          console.log('✅ API key saved directly:', newRecord);
+          
+        } catch (directError) {
+          console.log('🔍 Debug: Direct save failed, trying service endpoint:', directError);
+          
+          // Fallback to service endpoint
+          const saveResponse = await fetch(`http://localhost:3001/save-key?userId=${encodeURIComponent(user.id)}&apiKey=${encodeURIComponent(apiKey)}`, {
+            method: 'POST'
+          });
+          
+          if (!saveResponse.ok) {
+            throw new Error(`Service save failed: ${saveResponse.statusText}`);
+          }
+          
+          const saveResult = await saveResponse.json();
+          console.log('✅ API key saved via service:', saveResult);
         }
-        
-        const saveResult = await saveResponse.json();
-        console.log('✅ API key saved via service:', saveResult);
 
         showSettingsStatus('API Schlüssel erfolgreich gespeichert', 'completed');
         log('🔑 API Schlüssel gespeichert');
