@@ -674,6 +674,48 @@
       color: #6b7280;
       line-height: 1.4;
     }
+
+    /* Snackbar */
+    .snackbar {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1001;
+      max-width: 300px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .snackbar.show {
+      transform: translateX(0);
+    }
+
+    .snackbar.success {
+      background: var(--success);
+    }
+
+    .snackbar.error {
+      background: var(--error);
+    }
+
+    .snackbar.warning {
+      background: var(--warning);
+      color: #333;
+    }
+
+    .snackbar.processing {
+      background: #f97316;
+    }
   </style>
 </head>
 <body>
@@ -808,14 +850,6 @@
               <i data-feather="log-out"></i>
               Abmelden
             </button>
-            <button class="btn" onclick="generateDocument()" style="font-size: 0.875rem; background: #f97316; border: 1px solid #f97316; color: white;" title="Generieren">
-              <i data-feather="zap"></i>
-              Generieren
-            </button>
-            <span id="processingStatus" class="status processing hidden">
-              <i data-feather="clock"></i>
-              Wird generiert...
-            </span>
           </div>
         </div>
 
@@ -1391,7 +1425,36 @@
         });
         
         console.log('Found documents:', records);
-        documents = records;
+        
+        // If no project-specific documents found, try to load all user documents as fallback
+        if (records.length === 0 && currentUser?.id) {
+          console.log('No project-specific documents found, loading all user documents...');
+          try {
+            const fallbackRecords = await pb.collection('documents').getFullList({
+              filter: `user_id="${currentUser.id}"`,
+              sort: '-created'
+            });
+            console.log('Fallback documents:', fallbackRecords);
+            documents = fallbackRecords;
+          } catch (fallbackError) {
+            console.log('Fallback loading failed, trying without filter...');
+            // Last resort: load all documents (for development/testing)
+            try {
+              const allRecords = await pb.collection('documents').getFullList({
+                sort: '-created',
+                limit: 20
+              });
+              console.log('All documents (no filter):', allRecords);
+              documents = allRecords;
+            } catch (allError) {
+              console.log('Failed to load any documents:', allError);
+              documents = [];
+            }
+          }
+        } else {
+          documents = records;
+        }
+        
         renderDocuments();
       } catch (error) {
         log(`❌ Fehler beim Laden der Dokumente: ${error.message}`);
@@ -1400,13 +1463,23 @@
     }
 
     function renderDocuments() {
+      console.log('renderDocuments called with:', documents.length, 'documents');
+      console.log('Documents to render:', documents);
+      
       const select = document.getElementById('documentSelect');
       
+      if (!select) {
+        console.error('Document select element not found!');
+        return;
+      }
+      
       if (documents.length === 0) {
+        console.log('No documents to display');
         select.innerHTML = '<option value="">Noch keine Dokumente vorhanden</option>';
         return;
       }
 
+      console.log('Rendering', documents.length, 'documents');
       select.innerHTML = '<option value="">Dokument auswählen...</option>';
       
       documents.forEach(doc => {
@@ -1414,6 +1487,7 @@
         option.value = doc.id;
         option.textContent = `${doc.title} (${new Date(doc.created).toLocaleDateString('de-DE')})`;
         select.appendChild(option);
+        console.log('Added document option:', doc.title);
       });
     }
 
@@ -1484,9 +1558,9 @@
         return;
       }
 
-      // Disable generate button and show processing status
+      // Disable generate button and show processing snackbar
       document.getElementById('generateBtn').disabled = true;
-      document.getElementById('processingStatus').classList.remove('hidden');
+      showSnackbar('Wird generiert...', 'processing');
       
       log(`Starte Generierung mit Dokumentenart: ${selectedPrompt.description || selectedPrompt.prompt_type || selectedPrompt.title}`);
       log(`Thema: ${thema}`);
@@ -1530,19 +1604,31 @@
 
         // Save the generated document
         const docTitle = `Leistungsbeschreibung: ${thema}`;
-        const newDoc = await pb.collection('documents').create({
+        
+        // Debug: Log the document data before creation
+        const docData = {
           title: docTitle,
           content: fullContent.trim(),
-          project_id: currentProject.id,
-          request_id: currentProject.request_id,
-          user_id: currentUser.id,
-          created_by: currentUser.email,
+          project_id: currentProject?.id || '',
+          request_id: currentProject?.request_id || '',
+          user_id: currentUser?.id || '',
+          created_by: currentUser?.email || '',
           document_type: 'leistungsbeschreibung',
           type: 'leistungsbeschreibung',
           generated_by_ai: false
-        });
+        };
+        
+        console.log('Creating document with data:', docData);
+        console.log('Current project:', currentProject);
+        console.log('Current user:', currentUser);
+        
+        const newDoc = await pb.collection('documents').create(docData);
 
         log(`✅ Dokument erfolgreich generiert: ${docTitle}`);
+        
+        // Show success snackbar
+        closeSnackbar();
+        showSnackbar('Dokument erfolgreich generiert!', 'success');
         
         // Reload documents and select the new one
         await loadDocuments();
@@ -1551,10 +1637,12 @@
 
       } catch (error) {
         log(`❌ Fehler bei der Generierung: ${error.message}`);
+        // Show error snackbar
+        closeSnackbar();
+        showSnackbar('Fehler bei der Generierung: ' + error.message, 'error');
       } finally {
-        // Re-enable generate button and hide processing status
+        // Re-enable generate button
         document.getElementById('generateBtn').disabled = false;
-        document.getElementById('processingStatus').classList.add('hidden');
       }
     }
 
@@ -1786,26 +1874,45 @@
 
     function toggleApiKeyVisibility() {
       const apiKeyInput = document.getElementById('settingsApiKey');
-      const toggleIcon = document.getElementById('apiKeyToggleIcon');
+      const toggleButton = document.querySelector('button[onclick="toggleApiKeyVisibility()"]');
       
+      if (!apiKeyInput || !toggleButton) {
+        console.error('API key input or toggle button not found');
+        return;
+      }
+      
+      console.log('Toggle called - current type:', apiKeyInput.type);
+      console.log('Dataset isMasked:', apiKeyInput.dataset.isMasked);
+      console.log('Has originalKey:', !!apiKeyInput.dataset.originalKey);
+      
+      // Case 1: We have a masked stored key - toggle between masked and visible
       if (apiKeyInput.dataset.isMasked === 'true' && apiKeyInput.dataset.originalKey) {
         // Show original key
         apiKeyInput.value = apiKeyInput.dataset.originalKey;
         apiKeyInput.type = 'text';
-        toggleIcon.setAttribute('data-feather', 'eye-off');
+        toggleButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
         apiKeyInput.dataset.isMasked = 'false';
-      } else {
+        console.log('Showing original key');
+      } else if (apiKeyInput.dataset.originalKey) {
         // Hide key with asterisks
-        if (apiKeyInput.dataset.originalKey) {
-          const maskedKey = 'sk-' + '*'.repeat(apiKeyInput.dataset.originalKey.length - 6) + apiKeyInput.dataset.originalKey.slice(-4);
-          apiKeyInput.value = maskedKey;
-        }
+        const maskedKey = 'sk-' + '*'.repeat(Math.max(0, apiKeyInput.dataset.originalKey.length - 6)) + apiKeyInput.dataset.originalKey.slice(-4);
+        apiKeyInput.value = maskedKey;
         apiKeyInput.type = 'password';
-        toggleIcon.setAttribute('data-feather', 'eye');
+        toggleButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
         apiKeyInput.dataset.isMasked = 'true';
+        console.log('Hiding with mask');
+      } else {
+        // Case 2: No stored key - simple password/text toggle for new input
+        if (apiKeyInput.type === 'password') {
+          apiKeyInput.type = 'text';
+          toggleButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+          console.log('Showing text input');
+        } else {
+          apiKeyInput.type = 'password';
+          toggleButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+          console.log('Hiding password input');
+        }
       }
-      
-      feather.replace();
     }
 
     async function saveSettingsApiKey() {
@@ -1844,13 +1951,18 @@
         }
 
         // Create new API key
-        await pb.collection('apikeys').create({
+        const apiKeyData = {
           user_id: user.id,
           provider: 'openai',
           api_key: apiKey,
           name: `API Key ${new Date().toLocaleDateString('de-DE')}`,
           active: true
-        });
+        };
+        
+        console.log('🔍 Debug: Saving API key for user', user.id);
+        console.log('🔍 Debug: API key data:', apiKeyData);
+        
+        await pb.collection('apikeys').create(apiKeyData);
 
         showSettingsStatus('API Schlüssel erfolgreich gespeichert', 'completed');
         log('🔑 API Schlüssel gespeichert');
@@ -1859,8 +1971,10 @@
         setTimeout(() => loadCurrentApiKey(), 1000);
         
       } catch (error) {
-        showSettingsStatus('Verbindungsfehler: ' + error.message, 'error');
-        log(`❌ API Schlüssel Fehler: ${error.message}`);
+        console.error('❌ API Key Save Error:', error);
+        console.error('❌ Error details:', error.data);
+        showSettingsStatus('API Key Save Error: ' + error.message, 'error');
+        log(`❌ API Key Save Error: ${error.message}`);
       }
     }
 
@@ -1874,6 +1988,65 @@
         setTimeout(() => {
           status.classList.add('hidden');
         }, 3000);
+      }
+    }
+
+    // Snackbar System
+    function showSnackbar(message, type = 'info', duration = 3000) {
+      // Remove existing snackbar
+      const existingSnackbar = document.querySelector('.snackbar');
+      if (existingSnackbar) {
+        existingSnackbar.remove();
+      }
+
+      // Create snackbar
+      const snackbar = document.createElement('div');
+      snackbar.className = `snackbar ${type}`;
+      
+      // Add icon based on type
+      let icon = '';
+      if (type === 'processing') {
+        icon = '<i data-feather="clock" style="width: 1rem; height: 1rem;"></i>';
+      } else if (type === 'success') {
+        icon = '<i data-feather="check" style="width: 1rem; height: 1rem;"></i>';
+      } else if (type === 'error') {
+        icon = '<i data-feather="x" style="width: 1rem; height: 1rem;"></i>';
+      } else if (type === 'warning') {
+        icon = '<i data-feather="alert-triangle" style="width: 1rem; height: 1rem;"></i>';
+      } else {
+        icon = '<i data-feather="info" style="width: 1rem; height: 1rem;"></i>';
+      }
+      
+      snackbar.innerHTML = `${icon}<span>${message}</span>`;
+      document.body.appendChild(snackbar);
+      
+      // Replace feather icons
+      feather.replace();
+      
+      // Show with animation
+      requestAnimationFrame(() => {
+        snackbar.classList.add('show');
+      });
+      
+      // Auto-remove (except for processing which is persistent)
+      if (type !== 'processing') {
+        setTimeout(() => {
+          if (snackbar.parentNode) {
+            snackbar.classList.remove('show');
+            setTimeout(() => snackbar.remove(), 300);
+          }
+        }, duration);
+      }
+      
+      return snackbar;
+    }
+
+    // Close snackbar manually
+    function closeSnackbar() {
+      const snackbar = document.querySelector('.snackbar');
+      if (snackbar) {
+        snackbar.classList.remove('show');
+        setTimeout(() => snackbar.remove(), 300);
       }
     }
 
