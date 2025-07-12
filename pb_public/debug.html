@@ -5,6 +5,8 @@
   <title>🔧 OpenCode Debug Dashboard v2</title>
   <!-- Feather Icons -->
   <script src="https://unpkg.com/feather-icons"></script>
+  <!-- PocketBase SDK - CDN -->
+  <script type="text/javascript" src="https://unpkg.com/pocketbase@0.26.1/dist/pocketbase.umd.js"></script>
   <style>
     /* --- Basis-Styling --- */
     :root {
@@ -442,6 +444,9 @@
     const pbAPI = `${baseURL}/api`;
     const opencodeAPI = `${baseURL.replace(':8090', ':3001')}`;
     
+    // Initialize PocketBase client
+    const pb = new PocketBase(baseURL);
+    
     console.log('🌐 Detected URLs:', { baseURL, pbAPI, opencodeAPI });
     
     function log(message) {
@@ -576,28 +581,32 @@
         
         log(`🔍 Debug: Saving API key for user ${userId}`);
         
-        // Use OpenCode service to save API key directly (bypasses PocketBase collection issues)
-        const res = await fetch(`${baseURL}/opencode/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json' 
-          }
+        // Use PocketBase collection directly (correct approach)
+        
+        // First deactivate all existing API keys for this user
+        const existingKeys = await pb.collection('apikeys').getFullList({
+          filter: `user_id="${userId}" && active=true`
         });
 
-        log(`🔍 Debug: Response status: ${res.status}`);
-
-        if (res.ok) {
-          const result = await res.json();
-          log(`✅ API Key saved successfully: ${JSON.stringify(result)}`);
-          document.getElementById('api-key-status').innerHTML = '✅ API Key gespeichert';
-          log('✅ API Key erfolgreich gespeichert');
-        } else {
-          const error = await res.json();
-          log(`❌ API Key save failed with status ${res.status}: ${JSON.stringify(error)}`);
-          document.getElementById('api-key-status').innerHTML = '❌ Fehler beim Speichern';
-          log('❌ API Key Speicher-Fehler: ' + JSON.stringify(error));
+        for (const key of existingKeys) {
+          await pb.collection('apikeys').update(key.id, { active: false });
         }
+
+        // Create new API key record
+        await pb.collection('apikeys').create({
+          user_id: userId,
+          provider: 'openai',
+          api_key: apiKey,
+          name: `API Key ${new Date().toLocaleDateString('de-DE')}`,
+          active: true
+        });
+
+        log('✅ API Key erfolgreich gespeichert');
+        document.getElementById('api-key-status').innerHTML = '✅ API Key gespeichert';
+        
+        // Clear the input field
+        document.getElementById('openai-key').value = '';
+        
       } catch (e) {
         document.getElementById('api-key-status').innerHTML = '❌ Verbindungsfehler';
         log('❌ API Key Save Error: ' + e.message);
@@ -619,26 +628,18 @@
       // SECURITY: No hardcoded API keys or user-specific fallbacks
       // All users must properly save their API keys via the interface
       try {
-        const res = await fetch(`${baseURL}/opencode/load-key?userId=${userId}`, {
-          method: 'GET',
-          headers: { 
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json' 
-          }
+        // Load active API key for this user from PocketBase collection
+        const apiKeys = await pb.collection('apikeys').getFullList({
+          filter: `user_id="${userId}" && active=true`
         });
 
-        if (res.ok) {
-          const result = await res.json();
-          if (result.key) {
-            document.getElementById('api-key-status').innerHTML = `🔑 Key: ${result.key.substring(0, 8)}... (gespeichert)`;
-            log('✅ API Key gefunden (aus Datenbank)');
-          } else {
-            document.getElementById('api-key-status').innerHTML = '⚠️ Kein API Key gespeichert';
-            log('⚠️ Kein API Key für diesen User gefunden');
-          }
+        if (apiKeys.length > 0) {
+          const activeKey = apiKeys[0];
+          document.getElementById('api-key-status').innerHTML = `🔑 Key: ${activeKey.api_key.substring(0, 8)}... (gespeichert)`;
+          log('✅ API Key gefunden (aus Datenbank)');
         } else {
-          document.getElementById('api-key-status').innerHTML = '❌ Fehler beim Laden';
-          log('❌ Fehler beim Laden des API Keys');
+          document.getElementById('api-key-status').innerHTML = '⚠️ Kein API Key gespeichert';
+          log('⚠️ Kein API Key für diesen User gefunden');
         }
       } catch (e) {
         document.getElementById('api-key-status').innerHTML = '❌ Verbindungsfehler';

@@ -1,35 +1,19 @@
 {
-  "name": "opencode-multiuser",
+  "name": "pb-cli-test-processor",
   "version": "1.0.0",
-  "description": "Multiuser OpenCode system with PocketBase backend",
-  "main": "opencode-service.js",
+  "description": "CLI Command Processor for Document Generation",
+  "main": "process_cli_commands.js",
   "scripts": {
-    "start": "node opencode-service.js",
-    "dev": "nodemon opencode-service.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "docker:build": "docker build -t opencode-multiuser .",
-    "docker:run": "docker run -p 8090:8090 -p 3001:3001 -e OPENAI_API_KEY=\"$OPENAI_API_KEY\" opencode-multiuser"
+    "start": "node process_cli_commands.js",
+    "dev": "nodemon process_cli_commands.js"
   },
-  "keywords": [
-    "opencode",
-    "multiuser",
-    "pocketbase",
-    "ai",
-    "code-generation"
-  ],
-  "author": "OpenCode Team",
-  "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.18.2",
-    "puppeteer": "^24.12.1",
-    "sqlite3": "^5.1.6"
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=14.0.0"
   }
 }

@@ -42,15 +42,15 @@ async function getUserApiKey(userId, authenticatedUserId = null) {
     // Datenbank-Zugriff mit Sicherheitsprüfung für andere User
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT key FROM apikeys WHERE user = ? ORDER BY updated DESC LIMIT 1`,
+        `SELECT api_key FROM apikeys WHERE user_id = ? AND active = 1 ORDER BY updated DESC LIMIT 1`,
         [userId],
         (err, row) => {
           if (err) {
             console.log(`❌ DB Error getting API key for user ${userId}:`, err);
             reject(err);
-          } else if (row && row.key) {
-            console.log(`🔑 Authorized access: Found API key for user ${userId}: ${row.key.substring(0, 8)}...`);
-            resolve(row.key);
+          } else if (row && row.api_key) {
+            console.log(`🔑 Authorized access: Found API key for user ${userId}: ${row.api_key.substring(0, 8)}...`);
+            resolve(row.api_key);
           } else {
             console.log(`⚠️ No API key found for user ${userId}`);
             resolve(null);
@@ -115,12 +115,20 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args für headless mode
-  const args = ['run', prompt];
-  if (model) args.push('--model', model);
+  // OpenCode args
+  const args = ['run'];
   
-  // Headless mode aktivieren
-  args.push('--headless');
+  // Model mit korrektem Format (openai/model)
+  if (model) {
+    const formattedModel = model.includes('/') ? model : `openai/${model}`;
+    args.push('--model', formattedModel);
+  } else {
+    // Standard model - use correct OpenAI model name
+    args.push('--model', 'openai/gpt-4o-mini');
+  }
+  
+  // Prompt als letztes Argument
+  args.push(prompt);
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
   console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
@@ -175,13 +183,14 @@ app.get('/opencode/stream', async (req, res) => {
         }
       );
     } else if (recordId) {
-      // Fallback: Altes System für prompts
+      // Fallback: Create document in documents collection
       db.run(
-        `UPDATE prompts SET result = ? WHERE id = ?`,
-        [fullOutput.trim(), recordId],
+        `INSERT INTO documents (id, title, content, request_id, type, created_by, created, updated) 
+         VALUES (?, ?, ?, ?, 'leistung', ?, datetime('now'), datetime('now'))`,
+        [recordId, `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`, fullOutput.trim(), recordId, userId],
         (err) => {
-          if (err) console.log('DB Update Error:', err);
-          else console.log(`💾 Saved result for record ${recordId}`);
+          if (err) console.log('DB Document Insert Error:', err);
+          else console.log(`💾 Saved document for record ${recordId}`);
         }
       );
     }
@@ -209,7 +218,7 @@ app.post('/save-key', async (req, res) => {
   try {
     // Check if user already has an API key
     const existing = await new Promise((resolve, reject) => {
-      db.get(`SELECT id FROM apikeys WHERE user = ? LIMIT 1`, [userId], (err, row) => {
+      db.get(`SELECT id FROM apikeys WHERE user_id = ? LIMIT 1`, [userId], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -218,7 +227,7 @@ app.post('/save-key', async (req, res) => {
     if (existing) {
       // Update existing
       await new Promise((resolve, reject) => {
-        db.run(`UPDATE apikeys SET key = ?, updated = datetime('now') WHERE user = ?`, [apiKey, userId], (err) => {
+        db.run(`UPDATE apikeys SET api_key = ?, updated = datetime('now') WHERE user_id = ?`, [apiKey, userId], (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -227,7 +236,7 @@ app.post('/save-key', async (req, res) => {
     } else {
       // Insert new
       await new Promise((resolve, reject) => {
-        db.run(`INSERT INTO apikeys (user, key, created, updated) VALUES (?, ?, datetime('now'), datetime('now'))`, [userId, apiKey], (err) => {
+        db.run(`INSERT INTO apikeys (user_id, provider, api_key, name, active, created, updated) VALUES (?, 'openai', ?, 'Auto-saved', 1, datetime('now'), datetime('now'))`, [userId, apiKey], (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -298,8 +307,41 @@ app.options('/opencode/stream', (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(PORT, () => {
+// Graceful shutdown handler
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+const server = app.listen(PORT, () => {
   console.log(`🚀 OpenCode Service läuft auf Port ${PORT}`);
   console.log(`🔗 Endpoint: http://127.0.0.1:${PORT}/opencode/stream`);
   console.log(`❤️  Health: http://127.0.0.1:${PORT}/health`);
+});
+
+// Handle server errors
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} ist bereits belegt. Stoppe andere Prozesse und versuche erneut.`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', err);
+    process.exit(1);
+  }
 });

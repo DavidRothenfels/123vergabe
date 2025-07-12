@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Single container deployment matching Dockerfile architecture
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+      - "3001:3001"
+    volumes:
+      - pb_data:/app/pb_data
+      - pb_logs:/app/pb_logs
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+
+volumes:
+  pb_data:
+  pb_logs:

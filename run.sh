@@ -37,12 +37,15 @@ cleanup() {
     echo ""
     echo "🛑 Shutting down services..."
     
+    # Stoppe alle Node.js opencode-service Prozesse
+    pkill -f "node opencode-service.js" 2>/dev/null || true
+    
     # Stoppe PocketBase
     if [ ! -z "$POCKETBASE_PID" ]; then
         kill $POCKETBASE_PID 2>/dev/null || true
     fi
     
-    # Stoppe Node.js Service
+    # Stoppe Node.js Service (falls PID verfügbar)
     if [ ! -z "$NODEJS_PID" ]; then
         kill $NODEJS_PID 2>/dev/null || true
     fi
@@ -84,6 +87,10 @@ fi
 
 echo ""
 echo "🔧 Starting Node.js OpenCode Service..."
+
+# Stoppe eventuell bereits laufende opencode-service Prozesse
+pkill -f "node opencode-service.js" 2>/dev/null || true
+sleep 2
 
 # Starte Node.js Service
 node opencode-service.js &

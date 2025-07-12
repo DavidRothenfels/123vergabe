@@ -1,179 +1,161 @@
 #!/bin/bash
+
+# Production Start Script für OpenCode Multiuser System
+# Robustes Startup mit Health Checks und Monitoring
+
 set -e
 
-echo "🚀 Starting OpenCode Multiuser System (Production)"
-echo "📊 Using PM2 for process management"
+echo "🚀 Starting OpenCode Multiuser System - Production Mode"
+echo "============================================="
 
-# Ensure log directory exists
-mkdir -p pb_logs
+# Logging setup
+LOG_DIR="/app/pb_logs"
+mkdir -p "$LOG_DIR"
+exec > >(tee -a "$LOG_DIR/startup.log")
+exec 2> >(tee -a "$LOG_DIR/startup.log" >&2)
 
-# Export environment variables
-export NODE_ENV="production"
-export PORT="3001"
-
-# Validate OPENAI_API_KEY
-if [[ -z "$OPENAI_API_KEY" || "$OPENAI_API_KEY" == "your-openai-api-key-here" || "$OPENAI_API_KEY" == "REPLACE_WITH_YOUR_OPENAI_API_KEY" ]]; then
-    echo "⚠️  WARNING: No valid OPENAI_API_KEY provided"
-    echo "   Service will start but OpenAI features may not work"
-    echo "   Set OPENAI_API_KEY environment variable for full functionality"
-    # Set a recognizable placeholder
-    export OPENAI_API_KEY="DOCKER_PLACEHOLDER_KEY"
-else
-    echo "✅ Using provided OPENAI_API_KEY: ${OPENAI_API_KEY:0:8}..."
-fi
-
-# Start PocketBase in background
-echo "🔧 Starting PocketBase v0.28.4..."
-echo "📂 Current directory: $(pwd)"
-echo "🔍 PocketBase binary check:"
-ls -la ./pocketbase 2>/dev/null || echo "❌ PocketBase binary not found in current directory"
-ls -la /app/pocketbase 2>/dev/null || echo "❌ PocketBase binary not found in /app"
-
-# Start PocketBase from the correct location
-cd /app
-echo "🔍 Starting PocketBase with debugging..."
-echo "📂 Working directory: $(pwd)"
-echo "🔍 PocketBase binary exists: $(test -f ./pocketbase && echo "YES" || echo "NO")"
-echo "🔍 PocketBase binary permissions: $(ls -la ./pocketbase 2>/dev/null || echo "File not found")"
-
-# Create pb_data directory if it doesn't exist
-mkdir -p pb_data pb_logs
-
-# Start PocketBase with explicit output and error logging
-echo "🚀 Executing: ./pocketbase serve --http=0.0.0.0:8090"
-./pocketbase serve --http=0.0.0.0:8090 > pb_logs/pocketbase.out 2> pb_logs/pocketbase.err &
-POCKETBASE_PID=$!
-echo "📍 PocketBase PID: $POCKETBASE_PID"
-
-# Give PocketBase a moment to start
-sleep 3
-
-# Check if the process is still running
-if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
-    echo "❌ PocketBase process died immediately!"
-    echo "🔍 PocketBase STDOUT:"
-    cat pb_logs/pocketbase.out 2>/dev/null || echo "No stdout output"
-    echo "🔍 PocketBase STDERR:"
-    cat pb_logs/pocketbase.err 2>/dev/null || echo "No stderr output"
+# Environment validation
+if [ -z "$OPENAI_API_KEY" ] || [ "$OPENAI_API_KEY" = "DOCKER_PLACEHOLDER_KEY" ]; then
+    echo "❌ OPENAI_API_KEY not properly configured"
+    echo "💡 Set environment variable: OPENAI_API_KEY='your-api-key'"
     exit 1
 fi
 
-# Wait for PocketBase to be ready
-echo "⏳ Waiting for PocketBase to start..."
-timeout=60
-while [ $timeout -gt 0 ]; do
-    if curl -f http://localhost:8090/api/health 2>/dev/null; then
-        echo "✅ PocketBase is ready!"
-        break
+echo "✅ OPENAI_API_KEY configured: ${OPENAI_API_KEY:0:8}..."
+
+# Create necessary directories
+mkdir -p pb_data pb_logs temp /var/log
+
+# Start health check daemon in background (reduced frequency to avoid conflicts)
+echo "🏥 Starting health check daemon..."
+./healthcheck.sh --daemon &
+HEALTHCHECK_PID=$!
+echo "📍 Health Check PID: $HEALTHCHECK_PID"
+
+# Cleanup function for graceful shutdown
+cleanup() {
+    echo ""
+    echo "🛑 Production shutdown initiated..."
+    
+    # Stop health check daemon
+    if [ ! -z "$HEALTHCHECK_PID" ]; then
+        kill $HEALTHCHECK_PID 2>/dev/null || true
     fi
-    echo "⏳ Still waiting... ($timeout seconds remaining)"
-    # Show recent logs if available
-    if [ -f pb_logs/pocketbase.err ] && [ -s pb_logs/pocketbase.err ]; then
-        echo "🔍 Recent PocketBase errors:"
-        tail -n 3 pb_logs/pocketbase.err
-    fi
-    sleep 2
-    timeout=$((timeout-2))
-done
-
-if [ $timeout -le 0 ]; then
-    echo "❌ PocketBase failed to start within timeout"
-    echo "🔍 Final PocketBase STDOUT:"
-    cat pb_logs/pocketbase.out 2>/dev/null || echo "No stdout output"
-    echo "🔍 Final PocketBase STDERR:"
-    cat pb_logs/pocketbase.err 2>/dev/null || echo "No stderr output"
-    echo "🔍 Process status:"
-    kill -0 $POCKETBASE_PID 2>/dev/null && echo "Process still running" || echo "Process not running"
-    exit 1
-fi
-
-# Create admin user after PocketBase is ready
-echo "👤 Creating admin user..."
-echo "📧 Email: admin@vergabe.de"
-echo "🔑 Password: admin123"
-
-# Create admin using PocketBase superuser command
-./pocketbase superuser upsert admin@vergabe.de admin123
-
-if [ $? -eq 0 ]; then
-    echo "✅ Admin user created successfully!"
-else
-    echo "❌ Failed to create admin user"
-    echo "📌 Admin creation failed - manual intervention may be needed"
-fi
-
-# Start Node.js service with PM2
-echo "🔧 Starting Node.js service with PM2..."
-pm2 start ecosystem.config.js --env production
-
-# Wait for Node.js service to be ready
-echo "⏳ Waiting for Node.js service to start..."
-timeout=30
-while [ $timeout -gt 0 ]; do
-    if curl -f http://localhost:3001/health 2>/dev/null; then
-        echo "✅ Node.js service is ready!"
-        break
-    fi
-    sleep 2
-    timeout=$((timeout-2))
-done
-
-if [ $timeout -le 0 ]; then
-    echo "❌ Node.js service failed to start"
-    pm2 logs --lines 20
-    exit 1
-fi
-
-echo ""
-echo "🎉 All services started successfully!"
-echo "📊 PM2 Status:"
-pm2 status
-echo ""
-echo "🌐 Dashboard: http://localhost:8090/debug.html"
-echo "⚙️  PocketBase Admin: http://localhost:8090/_/"
-echo "📊 PM2 Logs: pm2 logs"
-echo ""
-
-# Function to handle shutdown
-shutdown() {
-    echo "🛑 Shutting down services..."
-    pm2 stop all
-    pm2 delete all
-    kill $POCKETBASE_PID 2>/dev/null || true
-    wait
-    echo "✅ Shutdown complete"
+    
+    # Stop all services
+    pkill -f "node opencode-service.js" 2>/dev/null || true
+    pkill -f "pocketbase" 2>/dev/null || true
+    
+    echo "✅ Production services stopped"
     exit 0
 }
 
-# Set up signal handlers
-trap shutdown SIGTERM SIGINT
+# Signal handlers
+trap cleanup SIGINT SIGTERM
 
-# Keep the script running and show real-time status
-echo "💡 System running. Use Ctrl+C to stop."
-echo "📊 Real-time status monitoring..."
+# Start PocketBase with production settings
+echo "🔧 Starting PocketBase v0.28.4 (Production)..."
+./pocketbase serve \
+    --http=0.0.0.0:8090 \
+    --dir=/app/pb_data \
+    --hooksDir=/app/pb_hooks \
+    --publicDir=/app/pb_public \
+    --migrationsDir=/app/pb_migrations &
+POCKETBASE_PID=$!
 
-# Monitor services every 30 seconds
+echo "📍 PocketBase PID: $POCKETBASE_PID"
+
+# Wait for PocketBase with extended timeout
+echo "⏳ Waiting for PocketBase to start (production timeout: 60s)..."
+timeout=60
+while [ $timeout -gt 0 ]; do
+    if curl -f -s http://localhost:8090/api/health > /dev/null 2>&1; then
+        echo "✅ PocketBase is ready!"
+        break
+    fi
+    sleep 2
+    timeout=$((timeout-2))
+done
+
+if [ $timeout -le 0 ]; then
+    echo "❌ PocketBase failed to start within 60 seconds"
+    cleanup
+    exit 1
+fi
+
+# Start OpenCode Service with restart capability
+echo "🔧 Starting OpenCode Service (Production)..."
+node opencode-service.js &
+NODEJS_PID=$!
+
+echo "📍 OpenCode Service PID: $NODEJS_PID"
+
+# Wait for OpenCode Service
+echo "⏳ Waiting for OpenCode Service to start..."
+timeout=30
+while [ $timeout -gt 0 ]; do
+    if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
+        echo "✅ OpenCode Service is ready!"
+        break
+    fi
+    sleep 2
+    timeout=$((timeout-2))
+done
+
+if [ $timeout -le 0 ]; then
+    echo "❌ OpenCode Service failed to start"
+    cleanup
+    exit 1
+fi
+
+echo ""
+echo "🎉 Production system started successfully!"
+echo "============================================="
+echo ""
+echo "🌐 Production URLs:"
+echo "   • Dashboard: http://localhost:8090/debug.html"
+echo "   • PocketBase Admin: http://localhost:8090/_/"
+echo "   • OpenCode Service: http://localhost:3001"
+echo ""
+echo "📊 Process IDs:"
+echo "   • PocketBase: $POCKETBASE_PID"
+echo "   • OpenCode Service: $NODEJS_PID"
+echo "   • Health Check: $HEALTHCHECK_PID"
+echo ""
+echo "📋 Production Features:"
+echo "   • Health monitoring every 5 minutes (detailed)"
+echo "   • Process monitoring every 2 minutes (lightweight)"
+echo "   • Automatic restart on failure"
+echo "   • Disk space and memory monitoring"
+echo "   • Graceful shutdown handling"
+echo ""
+echo "🔄 Production system running... Monitoring active"
+
+# Production monitoring loop with coordinated intervals
 while true; do
-    sleep 30
+    sleep 120  # Coordinated with healthcheck.sh (300s) to avoid conflicts
     
-    # Check if PocketBase is still running
+    # Check PocketBase
     if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
-        echo "❌ PocketBase process died! Restarting..."
-        cd /app
-        ./pocketbase serve --http=0.0.0.0:8090 > pb_logs/pocketbase.out 2> pb_logs/pocketbase.err &
+        echo "❌ PocketBase process died! Attempting restart..."
+        ./pocketbase serve --http=0.0.0.0:8090 &
         POCKETBASE_PID=$!
-        echo "📍 New PocketBase PID: $POCKETBASE_PID"
+        echo "🔄 PocketBase restarted with PID: $POCKETBASE_PID"
     fi
     
-    # Check Node.js service via PM2
-    if ! pm2 describe opencode-service > /dev/null 2>&1; then
-        echo "❌ Node.js service not found in PM2! Restarting..."
-        pm2 start ecosystem.config.js --env production
+    # Check OpenCode Service
+    if ! kill -0 $NODEJS_PID 2>/dev/null; then
+        echo "❌ OpenCode Service died! Attempting restart..."
+        node opencode-service.js &
+        NODEJS_PID=$!
+        echo "🔄 OpenCode Service restarted with PID: $NODEJS_PID"
     fi
     
-    # Show status every 5 minutes (10 * 30s = 5min)
-    if [ $(($(date +%s) % 300)) -lt 30 ]; then
-        echo "🔄 $(date): System health check"
-        pm2 status
+    # Check Health Check Daemon
+    if ! kill -0 $HEALTHCHECK_PID 2>/dev/null; then
+        echo "❌ Health Check daemon died! Restarting..."
+        ./healthcheck.sh --daemon &
+        HEALTHCHECK_PID=$!
+        echo "🔄 Health Check restarted with PID: $HEALTHCHECK_PID"
     fi
 done

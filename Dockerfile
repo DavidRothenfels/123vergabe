@@ -1,14 +1,11 @@
-# Multi-stage build for OpenCode Multiuser System
-FROM node:20-alpine AS base
+# Simplified Dockerfile that copies all PocketBase data and files
+FROM node:20-alpine
 
-# Install system dependencies including process manager
+# Install system dependencies
 RUN apk add --no-cache \
     bash \
     curl \
     git \
-    python3 \
-    make \
-    g++ \
     sqlite \
     jq \
     && rm -rf /var/cache/apk/*
@@ -16,41 +13,41 @@ RUN apk add --no-cache \
 # Install PM2 for process management
 RUN npm install -g pm2
 
-# Install OpenCode CLI - use our working local version approach
-RUN npm install -g typescript ts-node
-
 # Create app directory
 WORKDIR /app
 
-# Copy package files first for better caching
+# Copy package files for dependencies
 COPY package*.json ./
 
 # Install Node.js dependencies
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy all application files first
-COPY . .
+# Copy the pre-built PocketBase binary directly
+COPY pocketbase ./pocketbase
+RUN chmod +x ./pocketbase
 
-# Download and replace with PocketBase v0.28.4
-RUN curl -L -o pocketbase_0.28.4_linux_amd64.zip \
-    https://github.com/pocketbase/pocketbase/releases/download/v0.28.4/pocketbase_0.28.4_linux_amd64.zip && \
-    unzip -o pocketbase_0.28.4_linux_amd64.zip && \
-    chmod +x pocketbase && \
-    rm pocketbase_0.28.4_linux_amd64.zip
+# Copy all PocketBase data (databases, storage, etc.)
+COPY pb_data/ ./pb_data/
+COPY pb_hooks/ ./pb_hooks/
+COPY pb_public/ ./pb_public/
+COPY pb_migrations/ ./pb_migrations/
 
-# Ensure PocketBase binary is executable
-RUN chmod +x pocketbase
+# Copy application files
+COPY *.js ./
+COPY *.sh ./
+COPY *.json ./
+COPY docker-opencode.sh /usr/local/bin/opencode
+RUN chmod +x /usr/local/bin/opencode
+RUN chmod +x ./*.sh
 
 # Create necessary directories
-RUN mkdir -p pb_data pb_logs temp
+RUN mkdir -p pb_logs temp
 
-# Set up OpenCode CLI environment
-ENV PATH="/root/.local/bin:${PATH}"
-RUN mkdir -p /root/.local/bin
-
-# Create OpenCode mock that calls OpenAI API directly for Docker demo
-COPY docker-opencode.sh /root/.local/bin/opencode
-RUN chmod +x /root/.local/bin/opencode
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV POCKETBASE_URL=http://localhost:8090
+ENV PATH="/usr/local/bin:${PATH}"
 
 # Expose ports
 EXPOSE 8090 3001
@@ -59,15 +56,5 @@ EXPOSE 8090 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8090/api/health || exit 1
 
-# Create production startup script with PM2
-COPY start-production.sh ./start.sh
-
-RUN chmod +x start.sh
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3001
-ENV POCKETBASE_URL=http://localhost:8090
-
 # Start the application
-CMD ["./start.sh"]
+CMD ["./start-production.sh"]

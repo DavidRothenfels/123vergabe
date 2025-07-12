@@ -12,8 +12,10 @@ const tokenPayload = JSON.parse(atob(token.split('.')[1]));
 const userId = tokenPayload.id;
   - user field: relation to users collection with maxSelect=1
   - key field: text field, required
-  - Collection rules: @request.auth.id != '' && user = @request.auth.id
+  - (user) Collection rules: @request.auth.id != '' && user = @request.auth.id und nicht als type: "base".
 PocketBase JavaScript-Hooks haben keine Browser/Node.js APIs: setTimeout/setInterval, fetch, Promise/async-await, DOM APIs, Node.js modules - ES5-Grundfunktionen und PocketBase-spezifische APIs sind verfügbar
+Hinweis zur Filter-Syntax keine Leerzeichen um die Operatoren, Filter ohne Leerzeichen
+unter /pb_data kann die datenbank mit sqlite2 pb_data geändert werden
 
 openai Model: gpt-4.1-mini
 
