@@ -1,5 +1,6 @@
 # Vergabedokument-Generator Project
 
+deployment: pocketbase file  und datenbank aus pb_data über github container build (action) an coolify
 ## Versionen
 nutze pocketbase v0.28.4 //
 PocketBase v0.28.4 korrekte APIs:

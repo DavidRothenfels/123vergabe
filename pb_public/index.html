@@ -1962,7 +1962,17 @@
         console.log('🔍 Debug: Saving API key for user', user.id);
         console.log('🔍 Debug: API key data:', apiKeyData);
         
-        await pb.collection('apikeys').create(apiKeyData);
+        // Use OpenCode service endpoint to save API key (workaround for PocketBase validation issue)
+        const saveResponse = await fetch(`http://localhost:3001/save-key?userId=${encodeURIComponent(user.id)}&apiKey=${encodeURIComponent(apiKey)}`, {
+          method: 'POST'
+        });
+        
+        if (!saveResponse.ok) {
+          throw new Error(`Save failed: ${saveResponse.statusText}`);
+        }
+        
+        const saveResult = await saveResponse.json();
+        console.log('✅ API key saved via service:', saveResult);
 
         showSettingsStatus('API Schlüssel erfolgreich gespeichert', 'completed');
         log('🔑 API Schlüssel gespeichert');
