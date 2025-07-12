@@ -26,8 +26,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY pocketbase ./pocketbase
 RUN chmod +x ./pocketbase
 
-# Copy all PocketBase data (databases, storage, etc.)
-COPY pb_data/ ./pb_data/
+# Copy PocketBase configuration and code (pb_data will be created at runtime)
 COPY pb_hooks/ ./pb_hooks/
 COPY pb_public/ ./pb_public/
 COPY pb_migrations/ ./pb_migrations/
@@ -41,7 +40,7 @@ RUN chmod +x /usr/local/bin/opencode
 RUN chmod +x ./*.sh
 
 # Create necessary directories
-RUN mkdir -p pb_logs temp
+RUN mkdir -p pb_data pb_logs temp
 
 # Set environment variables
 ENV NODE_ENV=production
