@@ -16,6 +16,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --model)
             MODEL="$2"
+            # Extract just the model name if it's in provider/model format
+            if [[ "$MODEL" == *"/"* ]]; then
+                MODEL="${MODEL#*/}"
+            fi
+            # Map gpt-4.1-mini to gpt-4o-mini (correct API model name)
+            if [[ "$MODEL" == "gpt-4.1-mini" ]]; then
+                MODEL="gpt-4o-mini"
+            fi
             shift 2
             ;;
         --headless)
@@ -63,17 +71,20 @@ fi
 
 # Create OpenAI API request
 echo "🚀 OpenCode Docker - Processing: \"$PROMPT\""
+echo "📋 Using model: $MODEL"
 
 # Use curl to call OpenAI API
 RESPONSE=$(curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":1000,\"temperature\":0.7}" \
+    -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":4000,\"temperature\":0.7}" \
     https://api.openai.com/v1/chat/completions)
 
 # Check for API errors
 if echo "$RESPONSE" | grep -q '"error"'; then
     echo "❌ OpenAI API Error:"
-    echo "$RESPONSE" | grep -o '"message":"[^"]*"' | sed 's/"message":"//; s/"$//'
+    ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error // "Unknown error"' 2>/dev/null)
+    echo "Error details: $ERROR_MSG"
+    echo "Full response: $RESPONSE"
     exit 1
 fi
 

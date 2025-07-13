@@ -115,7 +115,7 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args - use run command with model flag
+  // OpenCode args - use run command with model flag and no-questions prompt
   const args = ['run'];
   
   // Model mit korrektem Format (openai/model)
@@ -127,8 +127,9 @@ app.get('/opencode/stream', async (req, res) => {
     args.push('--model', 'openai/gpt-4o-mini');
   }
   
-  // Prompt als letztes Argument
-  args.push(prompt);
+  // Modify prompt to prevent follow-up questions
+  const finalPrompt = prompt + "\n\nIMPORTANT: Provide a complete answer without asking follow-up questions. Do not ask if I want additional details or expansions.";
+  args.push(finalPrompt);
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
   console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
@@ -154,11 +155,19 @@ app.get('/opencode/stream', async (req, res) => {
 
   proc.stderr.on('data', chunk => {
     const txt = chunk.toString();
-    // In headless mode, stderr sollte weniger verbose sein
-    if (!txt.includes('█▀▀█') && !txt.includes('█░░█') && !txt.includes('▀▀▀▀')) {
+    // Filter out OpenCode UI elements and normal output
+    if (!txt.includes('█▀▀█') && !txt.includes('█░░█') && !txt.includes('▀▀▀▀') && 
+        !txt.includes('openai/') && !txt.includes('Text') && !txt.includes('|') &&
+        !txt.trim().startsWith('>') && !txt.trim().startsWith('@')) {
       fullOutput += '\n[ERR] ' + txt;
       res.write('[ERR] ' + txt);
       console.log(`❌ User ${userId} Error:`, txt);
+    }
+    // Treat stderr as normal output for OpenCode (it outputs content via stderr)
+    else if (txt.trim() && !txt.includes('█')) {
+      fullOutput += txt;
+      res.write(txt);
+      console.log(`📤 User ${userId} (stderr):`, txt.substring(0, 100));
     }
   });
 
