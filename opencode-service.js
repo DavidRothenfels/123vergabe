@@ -134,15 +134,32 @@ app.get('/opencode/stream', async (req, res) => {
   const args = ['-qc', scriptCommand, '/dev/null'];
   
   console.log(`🚀 Starting OpenCode...`);
-  console.log(`📋 Command: script ${args.join(' ')}`);
   
-  const proc = spawn('script', args, { 
-    env: {
-      ...env,
-      PATH: '/usr/local/bin:/usr/bin:/bin'
-    },
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
+  // Check if we're in Docker/Alpine (no script command)
+  const isAlpine = fs.existsSync('/etc/alpine-release');
+  let proc;
+  
+  if (isAlpine) {
+    // In Alpine/Docker: run opencode directly without script
+    console.log(`📋 Command: opencode run "..." --model ${modelName} (Alpine mode)`);
+    proc = spawn('opencode', ['run', finalPrompt, '--model', modelName], { 
+      env: {
+        ...env,
+        PATH: '/usr/local/bin:/usr/bin:/bin'
+      },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  } else {
+    // Local development: use script for TTY
+    console.log(`📋 Command: script ${args.join(' ')}`);
+    proc = spawn('script', args, { 
+      env: {
+        ...env,
+        PATH: '/usr/local/bin:/usr/bin:/bin'
+      },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  }
 
   // Register process
   userProcesses.set(userId, {
