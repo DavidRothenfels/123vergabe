@@ -74,9 +74,20 @@ echo "🚀 OpenCode Docker - Processing: \"$PROMPT\""
 echo "📋 Using model: $MODEL"
 
 # Use curl to call OpenAI API
+# Create JSON payload using jq to ensure proper escaping
+JSON_PAYLOAD=$(jq -n \
+    --arg model "$MODEL" \
+    --arg prompt "$PROMPT" \
+    '{
+        model: $model,
+        messages: [{role: "user", content: $prompt}],
+        max_tokens: 4000,
+        temperature: 0.7
+    }')
+
 RESPONSE=$(curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \
     -H "Content-Type: application/json" \
-    -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"max_tokens\":4000,\"temperature\":0.7}" \
+    -d "$JSON_PAYLOAD" \
     https://api.openai.com/v1/chat/completions)
 
 # Check for API errors
