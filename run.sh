@@ -1,25 +1,14 @@
 #!/bin/bash
 
-# Local Development Start Script für OpenCode Multiuser System
-# Startet PocketBase und Node.js Service für lokale Entwicklung
+# Development Start Script für OpenCode Multiuser System
+# Optimiert für Docker/Coolify-kompatibles lokales Development
 
 set -e
 
-echo "🚀 Starting OpenCode Multiuser System - Local Development"
+echo "🚀 Starting OpenCode Multiuser System - Development Mode"
 echo "============================================="
 
-# Überprüfe ob alle erforderlichen Dateien vorhanden sind
-if [ ! -f "./pocketbase" ]; then
-    echo "❌ PocketBase binary not found. Please run: ./docker-opencode.sh"
-    exit 1
-fi
-
-if [ ! -f "./opencode-service.js" ]; then
-    echo "❌ opencode-service.js not found"
-    exit 1
-fi
-
-# Überprüfe OPENAI_API_KEY
+# Environment Check
 if [ -z "$OPENAI_API_KEY" ]; then
     echo "❌ OPENAI_API_KEY environment variable not set"
     echo "💡 Please set your OpenAI API key:"
@@ -29,49 +18,59 @@ fi
 
 echo "✅ OPENAI_API_KEY configured: ${OPENAI_API_KEY:0:8}..."
 
-# Erstelle notwendige Verzeichnisse
+# Check OpenCode Installation
+if ! command -v opencode &> /dev/null; then
+    echo "⚠️  OpenCode not found. Installing globally..."
+    npm install -g opencode-ai@latest
+fi
+
+# Check PocketBase Binary
+if [ ! -f "./pocketbase" ]; then
+    echo "❌ PocketBase binary not found."
+    echo "💡 Please download PocketBase v0.28.4 or run: ./docker-opencode.sh"
+    exit 1
+fi
+
+# Create necessary directories (same as Docker)
 mkdir -p pb_data pb_logs temp
 
-# Funktion für sauberes Herunterfahren
+# Cleanup function
 cleanup() {
     echo ""
     echo "🛑 Shutting down services..."
     
-    # Stoppe alle Node.js opencode-service Prozesse
+    # Stop all processes
     pkill -f "node opencode-service.js" 2>/dev/null || true
+    pkill -f "pocketbase serve" 2>/dev/null || true
     
-    # Stoppe PocketBase
-    if [ ! -z "$POCKETBASE_PID" ]; then
-        kill $POCKETBASE_PID 2>/dev/null || true
-    fi
-    
-    # Stoppe Node.js Service (falls PID verfügbar)
-    if [ ! -z "$NODEJS_PID" ]; then
-        kill $NODEJS_PID 2>/dev/null || true
-    fi
+    # Wait for processes to stop
+    sleep 2
     
     echo "✅ Services stopped"
     exit 0
 }
 
-# Signal Handler für sauberes Herunterfahren
-trap cleanup SIGINT SIGTERM
+# Signal handlers
+trap cleanup SIGINT SIGTERM EXIT
 
+# Start PocketBase (same configuration as production)
 echo ""
 echo "🔧 Starting PocketBase v0.28.4..."
-echo "📂 Working directory: $(pwd)"
-
-# Starte PocketBase
-./pocketbase serve --http=127.0.0.1:8090 &
+./pocketbase serve \
+    --http=127.0.0.1:8090 \
+    --dir=./pb_data \
+    --hooksDir=./pb_hooks \
+    --publicDir=./pb_public \
+    --migrationsDir=./pb_migrations &
 POCKETBASE_PID=$!
 
 echo "📍 PocketBase PID: $POCKETBASE_PID"
 
-# Warte auf PocketBase Start
+# Wait for PocketBase
 echo "⏳ Waiting for PocketBase to start..."
 timeout=30
 while [ $timeout -gt 0 ]; do
-    if curl -f http://localhost:8090/api/health 2>/dev/null; then
+    if curl -f -s http://localhost:8090/api/health > /dev/null 2>&1; then
         echo "✅ PocketBase is ready!"
         break
     fi
@@ -81,29 +80,34 @@ done
 
 if [ $timeout -le 0 ]; then
     echo "❌ PocketBase failed to start"
-    cleanup
     exit 1
 fi
 
+# Start OpenCode Service
 echo ""
-echo "🔧 Starting Node.js OpenCode Service..."
+echo "🔧 Starting OpenCode Service..."
 
-# Stoppe eventuell bereits laufende opencode-service Prozesse
+# Set development environment
+export NODE_ENV=development
+export PORT=3001
+export POCKETBASE_URL=http://localhost:8090
+
+# Kill any existing opencode-service processes
 pkill -f "node opencode-service.js" 2>/dev/null || true
-sleep 2
+sleep 1
 
-# Starte Node.js Service
+# Start the service
 node opencode-service.js &
 NODEJS_PID=$!
 
-echo "📍 Node.js Service PID: $NODEJS_PID"
+echo "📍 OpenCode Service PID: $NODEJS_PID"
 
-# Warte auf Node.js Service Start
-echo "⏳ Waiting for Node.js service to start..."
-timeout=15
+# Wait for OpenCode Service
+echo "⏳ Waiting for OpenCode Service to start..."
+timeout=20
 while [ $timeout -gt 0 ]; do
-    if curl -f http://localhost:3001/health 2>/dev/null; then
-        echo "✅ Node.js service is ready!"
+    if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
+        echo "✅ OpenCode Service is ready!"
         break
     fi
     sleep 1
@@ -111,8 +115,7 @@ while [ $timeout -gt 0 ]; do
 done
 
 if [ $timeout -le 0 ]; then
-    echo "❌ Node.js service failed to start"
-    cleanup
+    echo "❌ OpenCode Service failed to start"
     exit 1
 fi
 
@@ -120,38 +123,36 @@ echo ""
 echo "🎉 All services started successfully!"
 echo "============================================="
 echo ""
-echo "🌐 URLs:"
+echo "🌐 Development URLs:"
 echo "   • Dashboard: http://localhost:8090/debug.html"
 echo "   • PocketBase Admin: http://localhost:8090/_/"
-echo "   • Node.js Service: http://localhost:3001"
+echo "   • OpenCode API: http://localhost:3001"
 echo ""
 echo "📊 Process IDs:"
 echo "   • PocketBase: $POCKETBASE_PID"
-echo "   • Node.js Service: $NODEJS_PID"
+echo "   • OpenCode Service: $NODEJS_PID"
 echo ""
 echo "💡 Development Tips:"
-echo "   • Edit hooks in pb_hooks/ (restart required)"
-echo "   • Edit frontend in pb_public/"
-echo "   • Edit Node.js service in opencode-service.js"
-echo "   • Use Ctrl+C to stop all services"
+echo "   • PocketBase hooks in pb_hooks/ (restart required)"
+echo "   • Frontend files in pb_public/"
+echo "   • OpenCode service in opencode-service.js"
+echo "   • Database in pb_data/data.db"
+echo "   • Press Ctrl+C to stop all services"
 echo ""
-echo "🔄 System running... Press Ctrl+C to stop"
+echo "🔄 Development system running... Press Ctrl+C to stop"
 
-# Monitoring Loop
+# Simple monitoring loop
 while true; do
     sleep 5
     
-    # Überprüfe PocketBase
+    # Check if processes are still running
     if ! kill -0 $POCKETBASE_PID 2>/dev/null; then
         echo "❌ PocketBase process died!"
-        cleanup
         exit 1
     fi
     
-    # Überprüfe Node.js Service
     if ! kill -0 $NODEJS_PID 2>/dev/null; then
-        echo "❌ Node.js service died!"
-        cleanup
+        echo "❌ OpenCode Service died!"
         exit 1
     fi
 done

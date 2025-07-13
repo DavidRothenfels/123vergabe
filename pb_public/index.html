@@ -14,11 +14,6 @@
   <script src="https://unpkg.com/feather-icons"></script>
   <!-- PocketBase SDK - CDN -->
   <script type="text/javascript" src="https://unpkg.com/pocketbase@0.26.1/dist/pocketbase.umd.js"></script>
-  <!-- KaTeX for LaTeX rendering -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
-    onload="window.katexLoaded = true; console.log('KaTeX loaded successfully');"></script>
   <style>
     /* --- Basis-Styling wie debug.html --- */
     :root {
@@ -768,15 +763,28 @@
       background: #f97316;
     }
 
-    /* KaTeX styles */
-    .katex-display {
-      margin: 1rem 0;
-      overflow-x: auto;
-      overflow-y: hidden;
+    /* Math formula styles */
+    .math-formula {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 0.25rem;
+      font-family: var(--mono);
+      font-size: 0.95em;
+      margin: 0 0.25rem;
     }
     
-    .katex {
-      font-size: 1.1em;
+    .math-block {
+      display: block;
+      padding: 1rem;
+      background: #f8f8f8;
+      border: 1px solid #e0e0e0;
+      border-radius: 0.5rem;
+      font-family: var(--mono);
+      margin: 1rem 0;
+      overflow-x: auto;
+      text-align: center;
     }
   </style>
 </head>
@@ -1083,6 +1091,59 @@
     let projects = [];
     let documents = [];
 
+    // Simple LaTeX to HTML converter
+    function convertLatexToHTML(text) {
+      // Replace display math $$...$$ with styled blocks
+      text = text.replace(/\$\$(.*?)\$\$/g, function(match, formula) {
+        return '<div class="math-block">' + formatMathFormula(formula) + '</div>';
+      });
+      
+      // Replace inline math $...$ with styled spans
+      text = text.replace(/\$(.*?)\$/g, function(match, formula) {
+        return '<span class="math-formula">' + formatMathFormula(formula) + '</span>';
+      });
+      
+      return text;
+    }
+    
+    // Format mathematical formulas for better readability
+    function formatMathFormula(formula) {
+      return formula
+        // Common LaTeX commands
+        .replace(/\\text\{([^}]+)\}/g, '$1')
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)')
+        .replace(/\\sum/g, 'Σ')
+        .replace(/\\times/g, '×')
+        .replace(/\\cdot/g, '·')
+        .replace(/\\div/g, '÷')
+        .replace(/\\pm/g, '±')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\gamma/g, 'γ')
+        .replace(/\\delta/g, 'δ')
+        .replace(/\\epsilon/g, 'ε')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\lambda/g, 'λ')
+        .replace(/\\mu/g, 'μ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\phi/g, 'φ')
+        .replace(/\\omega/g, 'ω')
+        .replace(/_{([^}]+)}/g, '<sub>$1</sub>')
+        .replace(/\^{([^}]+)}/g, '<sup>$1</sup>')
+        .replace(/_(\w)/g, '<sub>$1</sub>')
+        .replace(/\^(\w)/g, '<sup>$1</sup>')
+        .replace(/\\sqrt\{([^}]+)\}/g, '√($1)')
+        .replace(/\\sqrt/g, '√')
+        .replace(/\\\\/g, '')
+        .trim();
+    }
+
     // Initialize app
     window.onload = async () => {
       // Initialize PocketBase - auto-detect URL
@@ -1091,11 +1152,6 @@
       
       // Initialize Feather icons
       feather.replace();
-      
-      // Initialize KaTeX auto-render when available
-      if (window.renderMathInElement) {
-        console.log('KaTeX auto-render loaded and ready');
-      }
       
       // Check if user is already logged in
       if (pb.authStore.isValid) {
@@ -1506,33 +1562,9 @@
           }
         }
         
-        // Fallback: Load all user documents if no project-specific ones found
-        if (records.length === 0 && currentUser?.id) {
-          console.log('No project documents found, loading all user documents...');
-          try {
-            records = await pb.collection('documents').getFullList({
-              filter: `user_id="${currentUser.id}"`,
-              sort: '-created'
-            });
-            console.log('User documents found:', records);
-          } catch (userError) {
-            console.log('User filter failed:', userError);
-          }
-        }
-        
-        // Last resort: Load all recent documents (for debugging)
+        // Only show project-specific documents - no fallback to all user documents
         if (records.length === 0) {
-          console.log('No user documents found, loading recent documents...');
-          try {
-            records = await pb.collection('documents').getFullList({
-              sort: '-created',
-              limit: 50
-            });
-            console.log('Recent documents found:', records);
-          } catch (allError) {
-            console.log('All documents query failed:', allError);
-            records = [];
-          }
+          console.log('No documents found for this project');
         }
         
         documents = records;
@@ -1590,8 +1622,11 @@
 
       currentDocument = documents.find(d => d.id === documentId);
       if (currentDocument) {
-        // Display markdown content with basic formatting preserved
-        const formattedContent = currentDocument.content
+        // First convert LaTeX formulas
+        let processedContent = convertLatexToHTML(currentDocument.content);
+        
+        // Then apply markdown formatting
+        const formattedContent = processedContent
           .replace(/#{3,6}\s(.+)/g, '<h4>$1</h4>')  // H4-H6 headers
           .replace(/#{2}\s(.+)/g, '<h3>$1</h3>')    // H3 headers
           .replace(/#{1}\s(.+)/g, '<h2>$1</h2>')    // H2 headers
@@ -1612,23 +1647,6 @@
 
         document.getElementById('documentViewer').innerHTML = wrappedContent;
         document.getElementById('copyBtn').disabled = false;
-        
-        // Render LaTeX formulas with KaTeX
-        setTimeout(() => {
-          if (window.renderMathInElement) {
-            renderMathInElement(document.getElementById('documentViewer'), {
-              delimiters: [
-                {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false},
-                {left: '\\(', right: '\\)', display: false},
-                {left: '\\[', right: '\\]', display: true}
-              ],
-              throwOnError: false
-            });
-          } else {
-            console.warn('KaTeX renderMathInElement not available yet');
-          }
-        }, 100);
         
         log(`📄 Dokument geladen: ${currentDocument.title}`);
       }
