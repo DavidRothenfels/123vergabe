@@ -132,8 +132,8 @@ ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
 
 WRITE THE COMPLETE DOCUMENT NOW:`;
 
-  // OpenCode args - use non-interactive prompt mode for headless operation
-  const args = ['-p', finalPrompt, '-q'];
+  // OpenCode args - use run command for headless operation
+  const args = ['run', finalPrompt];
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
   console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
