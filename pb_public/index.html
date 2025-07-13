@@ -1415,62 +1415,58 @@
       if (!currentProject) return;
       
       try {
-        // Load documents that belong to this project
-        let filter = '';
+        console.log('Loading documents for project:', currentProject);
+        
+        // Primary approach: Load documents by project_id
+        let records = [];
         if (currentProject.id) {
-          // Primary: Match by project_id 
-          filter = `project_id="${currentProject.id}"`;
-        } else if (currentProject.request_id) {
-          // Secondary: Match by request_id (legacy)
-          filter = `request_id="${currentProject.request_id}"`;
-        } else {
-          // Fallback: Match by user for backward compatibility
-          filter = `user_id="${currentUser.id}"`;
+          try {
+            records = await pb.collection('documents').getFullList({
+              filter: `project_id="${currentProject.id}"`,
+              sort: '-created'
+            });
+            console.log('Documents found by project_id:', records);
+          } catch (projectError) {
+            console.log('Project filter failed:', projectError);
+          }
         }
         
-        console.log('Loading documents with filter:', filter);
-        console.log('Current project:', currentProject);
-        
-        const records = await pb.collection('documents').getFullList({
-          filter: filter,
-          sort: '-created'
-        });
-        
-        console.log('Found documents:', records);
-        
-        // If no project-specific documents found, try to load all user documents as fallback
+        // Fallback: Load all user documents if no project-specific ones found
         if (records.length === 0 && currentUser?.id) {
-          console.log('No project-specific documents found, loading all user documents...');
+          console.log('No project documents found, loading all user documents...');
           try {
-            const fallbackRecords = await pb.collection('documents').getFullList({
+            records = await pb.collection('documents').getFullList({
               filter: `user_id="${currentUser.id}"`,
               sort: '-created'
             });
-            console.log('Fallback documents:', fallbackRecords);
-            documents = fallbackRecords;
-          } catch (fallbackError) {
-            console.log('Fallback loading failed, trying without filter...');
-            // Last resort: load all documents (for development/testing)
-            try {
-              const allRecords = await pb.collection('documents').getFullList({
-                sort: '-created',
-                limit: 20
-              });
-              console.log('All documents (no filter):', allRecords);
-              documents = allRecords;
-            } catch (allError) {
-              console.log('Failed to load any documents:', allError);
-              documents = [];
-            }
+            console.log('User documents found:', records);
+          } catch (userError) {
+            console.log('User filter failed:', userError);
           }
-        } else {
-          documents = records;
         }
         
+        // Last resort: Load all recent documents (for debugging)
+        if (records.length === 0) {
+          console.log('No user documents found, loading recent documents...');
+          try {
+            records = await pb.collection('documents').getFullList({
+              sort: '-created',
+              limit: 50
+            });
+            console.log('Recent documents found:', records);
+          } catch (allError) {
+            console.log('All documents query failed:', allError);
+            records = [];
+          }
+        }
+        
+        documents = records;
         renderDocuments();
       } catch (error) {
         log(`❌ Fehler beim Laden der Dokumente: ${error.message}`);
         console.error('Document loading error:', error);
+        documents = [];
+        renderDocuments();
       }
     }
 
