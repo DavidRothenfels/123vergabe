@@ -116,7 +116,7 @@ app.get('/opencode/stream', async (req, res) => {
   }
 
   // OpenCode args - use run command with model flag and no-questions prompt
-  const args = ['run'];
+  const args = ['run', '--print-logs'];
   
   // Model mit korrektem Format (openai/model)
   if (model) {
