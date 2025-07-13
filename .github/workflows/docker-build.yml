@@ -79,9 +79,20 @@ jobs:
         
         echo "Container started with ID: $CONTAINER_ID"
         
-        # Wait for services to start and show logs
-        echo "Waiting for services to start (60s)..."
-        sleep 60
+        # Wait for services to start with intelligent retry
+        echo "Waiting for services to start..."
+        MAX_WAIT=30
+        WAIT_TIME=0
+        
+        while [ $WAIT_TIME -lt $MAX_WAIT ]; do
+          if curl -f -s http://localhost:8090/api/health > /dev/null 2>&1; then
+            echo "✅ PocketBase is ready after ${WAIT_TIME}s"
+            break
+          fi
+          echo "⏳ Waiting for PocketBase... (${WAIT_TIME}s elapsed)"
+          sleep 5
+          WAIT_TIME=$((WAIT_TIME + 5))
+        done
         
         echo "Container logs:"
         docker logs opencode-test | tail -20
@@ -130,7 +141,7 @@ jobs:
 
   security-scan:
     runs-on: ubuntu-latest
-    needs: build-and-push
+    # Run in parallel, not blocking deployment
     if: github.event_name != 'pull_request'
     permissions:
       security-events: write

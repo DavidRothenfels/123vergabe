@@ -65,20 +65,20 @@ POCKETBASE_PID=$!
 
 echo "📍 PocketBase PID: $POCKETBASE_PID"
 
-# Wait for PocketBase with extended timeout
-echo "⏳ Waiting for PocketBase to start (production timeout: 60s)..."
-timeout=60
+# Wait for PocketBase with optimized timeout
+echo "⏳ Waiting for PocketBase to start (timeout: 30s)..."
+timeout=30
 while [ $timeout -gt 0 ]; do
     if curl -f -s http://localhost:8090/api/health > /dev/null 2>&1; then
         echo "✅ PocketBase is ready!"
         break
     fi
-    sleep 2
-    timeout=$((timeout-2))
+    sleep 1
+    timeout=$((timeout-1))
 done
 
 if [ $timeout -le 0 ]; then
-    echo "❌ PocketBase failed to start within 60 seconds"
+    echo "❌ PocketBase failed to start within 30 seconds"
     cleanup
     exit 1
 fi
@@ -92,14 +92,14 @@ echo "📍 OpenCode Service PID: $NODEJS_PID"
 
 # Wait for OpenCode Service
 echo "⏳ Waiting for OpenCode Service to start..."
-timeout=30
+timeout=20
 while [ $timeout -gt 0 ]; do
     if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
         echo "✅ OpenCode Service is ready!"
         break
     fi
-    sleep 2
-    timeout=$((timeout-2))
+    sleep 1
+    timeout=$((timeout-1))
 done
 
 if [ $timeout -le 0 ]; then
