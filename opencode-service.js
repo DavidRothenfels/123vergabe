@@ -115,8 +115,8 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args - use run command with print-logs for debugging
-  const args = ['run', '--print-logs'];
+  // OpenCode args - use prompt mode for non-interactive execution (v0.2.33+)
+  const args = ['--prompt', finalPrompt];
   
   // Model mit korrektem Format (openai/model)
   if (model) {
@@ -124,7 +124,7 @@ app.get('/opencode/stream', async (req, res) => {
     args.push('--model', formattedModel);
   } else {
     // Standard model - use correct OpenAI model name
-    args.push('--model', 'openai/gpt-4o-mini');
+    args.push('--model', 'openai/gpt-4.1-mini');
   }
   
   // Enhanced prompt to ensure complete document generation
@@ -140,7 +140,7 @@ CRITICAL INSTRUCTIONS:
 7. Output must be in Markdown format and at least 2000 words
 8. Begin immediately with the document content`;
   
-  args.push(finalPrompt);
+  // finalPrompt already passed with --prompt flag above
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
   console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
