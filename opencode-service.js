@@ -115,7 +115,7 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args - use run command with model flag and no-questions prompt
+  // OpenCode args - use run command with print-logs for debugging
   const args = ['run', '--print-logs'];
   
   // Model mit korrektem Format (openai/model)
@@ -127,7 +127,7 @@ app.get('/opencode/stream', async (req, res) => {
     args.push('--model', 'openai/gpt-4o-mini');
   }
   
-  // Modify prompt to prevent follow-up questions and ensure complete output
+  // Enhanced prompt to ensure complete document generation
   const finalPrompt = prompt + `
 
 CRITICAL INSTRUCTIONS:
