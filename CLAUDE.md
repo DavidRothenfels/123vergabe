@@ -2,6 +2,7 @@
 
 deployment: pocketbase file  und datenbank aus pb_data über github container build (action) an coolify
 ## Versionen
+nutze opencode, docs hier https://opencode.ai/docs/config/, repo hier https://github.com/sst/opencode
 nutze pocketbase v0.28.4 //
 PocketBase v0.28.4 korrekte APIs:
 

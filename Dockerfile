@@ -10,8 +10,8 @@ RUN apk add --no-cache \
     jq \
     && rm -rf /var/cache/apk/*
 
-# Install PM2 for process management
-RUN npm install -g pm2
+# Install PM2 for process management and OpenCode for headless operation
+RUN npm install -g pm2 opencode-ai@latest
 
 # Create app directory
 WORKDIR /app
@@ -36,9 +36,11 @@ COPY pb_migrations/ ./pb_migrations/
 COPY *.js ./
 COPY *.sh ./
 COPY *.json ./
-COPY docker-opencode.sh /usr/local/bin/opencode
-RUN chmod +x /usr/local/bin/opencode
 RUN chmod +x ./*.sh
+
+# Set environment for headless operation
+ENV DISPLAY=
+ENV NO_GUI=1
 
 # Create necessary directories
 RUN mkdir -p pb_data pb_logs temp

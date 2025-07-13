@@ -115,32 +115,25 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // OpenCode args - use run command (--prompt has issues in v0.2.33)
-  const args = ['run'];
-  
-  // Model mit korrektem Format (openai/model)
-  if (model) {
-    const formattedModel = model.includes('/') ? model : `openai/${model}`;
-    args.push('--model', formattedModel);
-  } else {
-    // Standard model - use correct OpenAI model name
-    args.push('--model', 'openai/gpt-4.1-mini');
-  }
-  
   // Enhanced prompt to ensure complete document generation
   const finalPrompt = prompt + `
 
-CRITICAL INSTRUCTIONS:
-1. Generate the COMPLETE document immediately - no questions, no clarifications, no requests for more information
-2. Start writing the document content RIGHT NOW - do not ask what I want or need
-3. Use the provided description and create a full, detailed document
-4. Do NOT ask follow-up questions like "What specific aspects would you like me to focus on?"
-5. Do NOT say things like "I'd be happy to help" or "Would you like me to..."
-6. Generate the complete document based on the requirements given
-7. Output must be in Markdown format and at least 2000 words
-8. Begin immediately with the document content`;
-  
-  args.push(finalPrompt);
+ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
+1. START IMMEDIATELY with document content - NO introductory text, NO questions, NO clarifications
+2. Generate COMPLETE 2000+ word document in German Markdown format
+3. NEVER ask "Welche spezifischen Aspekte..." or "Möchten Sie..." or similar questions
+4. NEVER say "Ich helfe gerne..." or "Benötigen Sie weitere..." or offer additional help
+5. DO NOT request more information - work with what is provided
+6. DO NOT ask about format, length, or structure - follow the given template
+7. BEGIN directly with "# [Document Title]" and continue with full content
+8. FORBIDDEN phrases: "Gerne helfe ich", "Welche weiteren", "Möchten Sie", "Soll ich", "Können Sie mir"
+9. END the document when complete - NO follow-up offers or questions
+10. IGNORE any tendency to be conversational - be purely document-focused
+
+WRITE THE COMPLETE DOCUMENT NOW:`;
+
+  // OpenCode args - use non-interactive prompt mode for headless operation
+  const args = ['-p', finalPrompt, '-q'];
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
   console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
@@ -202,13 +195,21 @@ CRITICAL INSTRUCTIONS:
         'ich benötige weitere informationen',
         'um ihnen besser helfen zu können',
         'könnten sie mir mitteilen',
+        'gerne helfe ich',
+        'welche weiteren',
+        'soll ich',
+        'können sie mir',
+        'falls sie weitere',
+        'wenn sie mehr',
+        'ich helfe ihnen gerne',
         'what specific aspects',
         'could you provide',
         'i need more information',
         'would you like me to',
         'can you tell me more',
         'i\'d be happy to help',
-        'how can i assist'
+        'how can i assist',
+        'let me know if you need'
       ];
       
       // Check if content contains questioning phrases
