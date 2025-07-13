@@ -14,6 +14,11 @@
   <script src="https://unpkg.com/feather-icons"></script>
   <!-- PocketBase SDK - CDN -->
   <script type="text/javascript" src="https://unpkg.com/pocketbase@0.26.1/dist/pocketbase.umd.js"></script>
+  <!-- KaTeX for LaTeX rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
+    onload="window.katexLoaded = true; console.log('KaTeX loaded successfully');"></script>
   <style>
     /* --- Basis-Styling wie debug.html --- */
     :root {
@@ -136,6 +141,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 2rem;
       height: calc(100vh - 140px);
+      overflow: hidden;
     }
 
     /* Cards */
@@ -147,6 +153,8 @@
       border: 1px solid #e1e5e9;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+      height: 100%;
     }
 
     .card-header {
@@ -271,6 +279,7 @@
       flex-direction: column;
       gap: 1rem;
       height: 100%;
+      overflow: hidden;
     }
 
     .document-viewer {
@@ -279,10 +288,14 @@
       border-radius: 0.5rem;
       padding: 1rem;
       overflow-y: auto;
+      overflow-x: hidden;
       background: #fafafa;
       font-family: var(--mono);
       font-size: 0.875rem;
       line-height: 1.6;
+      min-height: 0;
+      max-height: 600px;
+      word-wrap: break-word;
     }
 
     /* Status indicators */
@@ -454,7 +467,7 @@
     /* Project Selection */
     .project-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: 1rem;
       margin-top: 1rem;
     }
@@ -472,13 +485,14 @@
       color: #6b7280;
       font-size: 0.875rem;
       margin-bottom: 1rem;
-      margin-right: 1rem;
       line-height: 1.4;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
+      word-wrap: break-word;
+      hyphens: auto;
     }
 
     .project-card:hover {
@@ -610,6 +624,12 @@
     }
 
     /* Responsive */
+    @media (max-width: 1024px) {
+      .project-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      }
+    }
+
     @media (max-width: 768px) {
       .app-container {
         grid-template-columns: 1fr;
@@ -625,6 +645,11 @@
         padding: 1rem;
       }
 
+      .project-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.75rem;
+      }
+
       .modal-content {
         width: 95%;
         margin: 1rem;
@@ -636,6 +661,21 @@
 
       #mobileBackBtn {
         display: block !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .project-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+
+      .project-card {
+        padding: 1rem;
+      }
+
+      .content {
+        padding: 0.5rem;
       }
     }
 
@@ -727,6 +767,17 @@
     .snackbar.processing {
       background: #f97316;
     }
+
+    /* KaTeX styles */
+    .katex-display {
+      margin: 1rem 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    
+    .katex {
+      font-size: 1.1em;
+    }
   </style>
 </head>
 <body>
@@ -795,8 +846,8 @@
           </div>
 
           <div class="content" style="grid-template-columns: 1fr; padding: 2rem;">
-            <div class="card">
-              <div class="card-header" style="display: flex; align-items: center; gap: 1rem;">
+            <div class="card" style="max-height: calc(100vh - 200px); display: flex; flex-direction: column;">
+              <div class="card-header" style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                   <i data-feather="folder"></i>
                   <h2>Meine Projekte</h2>
@@ -806,8 +857,10 @@
                   Neues Projekt
                 </button>
               </div>
-              <div id="projectsList" class="project-grid">
-                <!-- Projects will be loaded here -->
+              <div style="flex: 1; overflow-y: auto; padding-top: 1rem;">
+                <div id="projectsList" class="project-grid">
+                  <!-- Projects will be loaded here -->
+                </div>
               </div>
             </div>
           </div>
@@ -895,6 +948,23 @@
               <button onclick="generateDocument()" id="generateBtn" title="Dokument generieren" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;">
                 <i data-feather="zap" style="color: #f97316;"></i>
               </button>
+
+              <!-- Process Controls (hidden by default) -->
+              <div id="processControls" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #f8f9fa; border-radius: 0.5rem; border: 1px solid #e9ecef;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <span style="font-size: 0.875rem; font-weight: 500; color: #495057;">
+                    <i data-feather="activity" style="width: 16px; height: 16px; margin-right: 0.25rem;"></i>
+                    OpenCode Prozess
+                  </span>
+                  <button onclick="cancelProcess()" style="padding: 0.25rem 0.75rem; background: #dc3545; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-size: 0.75rem; font-weight: 500; transition: all 0.2s;">
+                    <i data-feather="x" style="width: 12px; height: 12px; margin-right: 0.25rem;"></i>
+                    Abbrechen
+                  </button>
+                </div>
+                <div id="processStatus" style="font-size: 0.75rem; color: #6c757d; font-family: var(--mono);">
+                  Läuft...
+                </div>
+              </div>
 
               <!-- Live Logs -->
               <div style="margin-top: 1rem;">
@@ -1021,6 +1091,11 @@
       
       // Initialize Feather icons
       feather.replace();
+      
+      // Initialize KaTeX auto-render when available
+      if (window.renderMathInElement) {
+        console.log('KaTeX auto-render loaded and ready');
+      }
       
       // Check if user is already logged in
       if (pb.authStore.isValid) {
@@ -1538,6 +1613,23 @@
         document.getElementById('documentViewer').innerHTML = wrappedContent;
         document.getElementById('copyBtn').disabled = false;
         
+        // Render LaTeX formulas with KaTeX
+        setTimeout(() => {
+          if (window.renderMathInElement) {
+            renderMathInElement(document.getElementById('documentViewer'), {
+              delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+              ],
+              throwOnError: false
+            });
+          } else {
+            console.warn('KaTeX renderMathInElement not available yet');
+          }
+        }, 100);
+        
         log(`📄 Dokument geladen: ${currentDocument.title}`);
       }
     }
@@ -1570,6 +1662,9 @@
       document.getElementById('generateBtn').disabled = true;
       showSnackbar('Wird generiert...', 'processing');
       
+      // Show cancel button and start status checking
+      showProcessControls(true);
+      
       log(`Starte Generierung mit Dokumentenart: ${selectedPrompt.description || selectedPrompt.prompt_type || selectedPrompt.title}`);
       log(`Thema: ${thema}`);
 
@@ -1585,14 +1680,30 @@
         console.log('🔍 Debug: Original prompt:', selectedPrompt.prompt_text);
         console.log('🔍 Debug: Final prompt:', finalPrompt);
         
+        // Determine OpenCode API URL based on environment
+        let opencodeUrl;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          // Local development
+          opencodeUrl = `http://${window.location.hostname}:3001/opencode/stream`;
+        } else {
+          // Production - use path prefix for Coolify/Traefik routing
+          opencodeUrl = `/opencode-api/opencode/stream`;
+        }
+        
         // Call OpenCode service - use correct model format from CLAUDE.md
-        const response = await fetch(`./opencode/stream?prompt=${encodeURIComponent(finalPrompt)}&model=gpt-4.1-mini&userId=${currentUser.id}&projectId=${currentProject.id}`, {
+        const response = await fetch(`${opencodeUrl}?prompt=${encodeURIComponent(finalPrompt)}&model=gpt-4.1-mini&userId=${currentUser.id}&projectId=${currentProject.id}`, {
           headers: {
             'Authorization': 'Bearer ' + pb.authStore.token
           }
         });
 
         if (!response.ok) {
+          if (response.status === 429) {
+            // Process already running - show status and cancel option
+            const errorData = await response.json();
+            handleProcessAlreadyRunning(errorData);
+            return;
+          }
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
@@ -1615,26 +1726,63 @@
         }
 
         // Save the generated document
-        const docTitle = `Leistungsbeschreibung: ${thema}`;
+        // Dokumentenart aus selectedPrompt extrahieren
+        const dokumentenart = selectedPrompt?.description || 
+                             selectedPrompt?.title || 
+                             selectedPrompt?.prompt_type || 
+                             "Leistungsbeschreibung";
+        const projektName = currentProject?.name || "Unbenanntes Projekt";
+        const docTitle = `${projektName} - ${dokumentenart}`;
         
         // Debug: Log the document data before creation
         const docData = {
           title: docTitle,
           content: fullContent.trim(),
-          project_id: currentProject?.id || '',
-          request_id: currentProject?.request_id || '',
-          user_id: currentUser?.id || '',
-          created_by: currentUser?.email || '',
-          document_type: 'leistungsbeschreibung',
-          type: 'leistungsbeschreibung',
-          generated_by_ai: false
+          document_type: dokumentenart.toLowerCase().replace(/\s+/g, '_'),
+          type: dokumentenart.toLowerCase().replace(/\s+/g, '_'),
+          generated_by_ai: true
         };
+        
+        // Only add optional fields if they have valid values
+        if (currentProject?.id) {
+          docData.project_id = currentProject.id;
+        }
+        if (currentProject?.request_id) {
+          docData.request_id = currentProject.request_id;
+        }
+        if (currentUser?.id) {
+          docData.user_id = currentUser.id;
+          docData.created_by = currentUser.id;
+        } else {
+          docData.created_by = 'system';
+        }
         
         console.log('Creating document with data:', docData);
         console.log('Current project:', currentProject);
         console.log('Current user:', currentUser);
+        console.log('PB auth model:', pb.authStore.model);
         
-        const newDoc = await pb.collection('documents').create(docData);
+        // Ensure user_id is set for auth rules
+        if (pb.authStore.model?.id) {
+          docData.user_id = pb.authStore.model.id;
+          docData.created_by = pb.authStore.model.id; // Set created_by for user-specific access
+          console.log('Set user_id and created_by from authStore:', docData.user_id);
+        }
+        
+        try {
+          console.log('Final docData before create:', docData);
+          console.log('PB auth token:', pb.authStore.token);
+          const newDoc = await pb.collection('documents').create(docData);
+          console.log('Document created successfully:', newDoc);
+        } catch (createError) {
+          console.error('Document creation failed:', createError);
+          console.error('Error details:', createError.response?.data);
+          console.error('Full error object:', createError);
+          console.error('Error data field:', createError.data);
+          console.error('Error status:', createError.status);
+          console.error('Error message:', createError.message);
+          throw createError;
+        }
 
         log(`✅ Dokument erfolgreich generiert: ${docTitle}`);
         
@@ -1642,19 +1790,29 @@
         closeSnackbar();
         showSnackbar('Dokument erfolgreich generiert!', 'success');
         
-        // Reload documents and select the new one
+        // Reload documents
         await loadDocuments();
-        document.getElementById('documentSelect').value = newDoc.id;
-        loadDocument();
 
       } catch (error) {
-        log(`❌ Fehler bei der Generierung: ${error.message}`);
+        console.error('Generation error details:', error);
+        console.error('Error response:', error.response);
+        console.error('Error data:', error.data);
+        
+        let errorMessage = error.message;
+        if (error.response && error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.data && error.data.message) {
+          errorMessage = error.data.message;
+        }
+        
+        log(`❌ Fehler bei der Generierung: ${errorMessage}`);
         // Show error snackbar
         closeSnackbar();
-        showSnackbar('Fehler bei der Generierung: ' + error.message, 'error');
+        showSnackbar('Fehler bei der Generierung: ' + errorMessage, 'error');
       } finally {
-        // Re-enable generate button
+        // Re-enable generate button and hide process controls
         document.getElementById('generateBtn').disabled = false;
+        showProcessControls(false);
       }
     }
 
@@ -2169,6 +2327,108 @@
       }
     }
 
+    // Process status and cancel functionality
+    let statusCheckInterval = null;
+    
+    function showProcessControls(show) {
+      const controls = document.getElementById('processControls');
+      if (!controls) return;
+      
+      if (show) {
+        controls.style.display = 'block';
+        startStatusCheck();
+      } else {
+        controls.style.display = 'none';
+        stopStatusCheck();
+      }
+    }
+    
+    function startStatusCheck() {
+      if (statusCheckInterval) return;
+      
+      statusCheckInterval = setInterval(async () => {
+        try {
+          // Determine OpenCode API URL
+          const opencodeUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? `http://${window.location.hostname}:3001/opencode/status`
+            : `/opencode-api/opencode/status`;
+          
+          const response = await fetch(`${opencodeUrl}?userId=${currentUser.id}`);
+          if (!response.ok) {
+            // Skip status check if service not available
+            return;
+          }
+          const status = await response.json();
+          
+          updateProcessStatus(status);
+          
+          if (!status.running) {
+            // Process finished
+            stopStatusCheck();
+            showProcessControls(false);
+          }
+        } catch (error) {
+          console.error('Status check failed:', error);
+        }
+      }, 2000); // Check every 2 seconds
+    }
+    
+    function stopStatusCheck() {
+      if (statusCheckInterval) {
+        clearInterval(statusCheckInterval);
+        statusCheckInterval = null;
+      }
+    }
+    
+    function updateProcessStatus(status) {
+      const statusText = document.getElementById('processStatus');
+      if (!statusText) return;
+      
+      if (status.running) {
+        const runtime = Math.round(status.runtime / 1000);
+        statusText.textContent = `Läuft seit ${runtime}s (PID: ${status.pid})`;
+      } else {
+        statusText.textContent = 'Beendet';
+      }
+    }
+    
+    async function cancelProcess() {
+      try {
+        const response = await fetch(`./opencode/cancel?userId=${currentUser.id}`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          log(`🛑 Prozess abgebrochen (Laufzeit: ${Math.round(result.runtime/1000)}s)`);
+          showSnackbar('Prozess wurde abgebrochen', 'warning');
+          
+          // Reset UI
+          document.getElementById('generateBtn').disabled = false;
+          showProcessControls(false);
+        } else {
+          const error = await response.json();
+          throw new Error(error.error || 'Cancel failed');
+        }
+      } catch (error) {
+        console.error('Cancel failed:', error);
+        log(`❌ Fehler beim Abbrechen: ${error.message}`);
+        showSnackbar('Fehler beim Abbrechen: ' + error.message, 'error');
+      }
+    }
+    
+    async function handleProcessAlreadyRunning(errorData) {
+      const runtime = Math.round(errorData.runtime / 1000);
+      log(`⚠️ Bereits ein Prozess aktiv (${runtime}s) - zeige Abbrechen-Option`);
+      
+      showSnackbar(`Prozess läuft bereits (${runtime}s). Abbrechen?`, 'warning');
+      showProcessControls(true);
+      updateProcessStatus({ running: true, runtime: errorData.runtime, pid: 'unknown' });
+      
+      // Reset generate button
+      document.getElementById('generateBtn').disabled = false;
+    }
+    
     // Add notification HTML structure
     const notificationHTML = `
       <!-- Notification will be dynamically created here -->

@@ -409,7 +409,7 @@
           <h2>Live OpenCode Test</h2>
         </div>
         <textarea id="live-prompt" placeholder="Dein Prompt hier..." rows="3">Schreibe einen kurzen Witz</textarea>
-        <input id="live-model" placeholder="Modell (optional)" value="">
+        <input id="live-model" placeholder="Modell (optional)" value="openai/gpt-4.1-mini">
         <button class="btn btn-success" onclick="runLiveTest()">
           <i data-feather="play"></i>
           Live Test
@@ -442,7 +442,25 @@
     // Auto-detect base URLs based on current location
     const baseURL = window.location.origin;
     const pbAPI = `${baseURL}/api`;
-    const opencodeAPI = `${baseURL.replace(':8090', ':3001')}`;
+    
+    // OpenCode service URL detection for different environments
+    let opencodeAPI;
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Local development: OpenCode runs on separate port
+      opencodeAPI = `http://${window.location.hostname}:3001`;
+    } else if (window.location.pathname.includes('/pb_public/')) {
+      // Production with path-based routing (e.g., domain.com/opencode/)
+      // Assume OpenCode is proxied through the same domain
+      opencodeAPI = window.location.origin.replace('/pb_public', '') + '/opencode-api';
+    } else {
+      // Production: Try subdomain or path-based approach
+      // Option 1: Subdomain (e.g., opencode.domain.com)
+      // Option 2: Same domain with /api prefix
+      // For now, assume it's proxied through PocketBase
+      opencodeAPI = `${baseURL}/opencode-api`;
+    }
+    
+    console.log('🔧 Debug URLs:', { baseURL, opencodeAPI });
     
     // Initialize PocketBase client
     const pb = new PocketBase(baseURL);
@@ -497,20 +515,16 @@
         log('❌ PocketBase nicht erreichbar: ' + e.message);
       }
 
-      // OpenCode Service via PocketBase Proxy
+      // OpenCode Service Direct
       try {
-        const res = await fetch(`${baseURL}/opencode/health`);
+        const res = await fetch(`${opencodeAPI}/health`);
         if (res.ok) {
           const data = await res.json();
-          if (data.service === 'ok') {
-            updateStatus('opencode-status', 'OpenCode Service: ✅ OK', 'ok');
-            log('✅ OpenCode Service läuft auf Port ' + data.details.port);
-          } else {
-            updateStatus('opencode-status', 'OpenCode Service: ❌ Error', 'error');
-            log('❌ OpenCode Service Error: ' + data.error);
-          }
+          updateStatus('opencode-status', `OpenCode Service: ✅ OK (Port ${data.port || 3001})`, 'ok');
+          log('✅ OpenCode Service läuft: ' + JSON.stringify(data));
         } else {
-          updateStatus('opencode-status', 'OpenCode Service: ❌ Error', 'error');
+          updateStatus('opencode-status', 'OpenCode Service: ❌ HTTP ' + res.status, 'error');
+          log('❌ OpenCode Service HTTP Error: ' + res.status);
         }
       } catch (e) {
         updateStatus('opencode-status', 'OpenCode Service: ❌ Offline', 'error');
@@ -586,7 +600,7 @@
         log(`🔍 Debug: Saving API key for user ${userId}`);
         
         // Use Node.js service instead of PocketBase SDK (more reliable)
-        const saveRes = await fetch(`${baseURL.replace(':8090', ':3001')}/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
+        const saveRes = await fetch(`${opencodeAPI}/save-key?userId=${userId}&apiKey=${encodeURIComponent(apiKey)}`, {
           method: 'POST'
         });
         
@@ -684,20 +698,21 @@
     }
 
     async function testNodeService() {
-      log('🧪 Teste Node.js Service via PocketBase...');
+      log('🧪 Teste Node.js Service direkt...');
       try {
-        const res = await fetch(`${baseURL}/opencode/health`);
+        // Test direct connection to Node.js service
+        const res = await fetch(`${opencodeAPI}/health`);
         if (res.ok) {
           const data = await res.json();
-          log('✅ Node.js Service via PocketBase: ' + JSON.stringify(data));
-          document.getElementById('node-result').innerHTML = '<strong>✅ Service erreichbar via Proxy</strong>';
+          log('✅ Node.js Service Direct: ' + JSON.stringify(data));
+          document.getElementById('node-result').innerHTML = '<strong>✅ Service direkt erreichbar</strong><pre>' + JSON.stringify(data, null, 2) + '</pre>';
         } else {
           log('❌ Node.js Service Error: ' + res.status);
-          document.getElementById('node-result').innerHTML = '<strong>❌ Service Error</strong>';
+          document.getElementById('node-result').innerHTML = '<strong>❌ Service Error: ' + res.status + '</strong>';
         }
       } catch (e) {
         log('❌ Node.js Service Error: ' + e.message);
-        document.getElementById('node-result').innerHTML = '<strong>❌ Service nicht erreichbar</strong>';
+        document.getElementById('node-result').innerHTML = '<strong>❌ Service nicht erreichbar</strong><br>' + e.message;
       }
     }
 
@@ -715,7 +730,12 @@
       log(`🚀 Live-Test mit: "${prompt}"`);
 
       try {
-        const res = await fetch(`http://127.0.0.1:8090/opencode/stream?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}`, {
+        // Get current user ID from token
+        const tokenParts = token.split('.');
+        const payload = JSON.parse(atob(tokenParts[1]));
+        const userId = payload.id || 'anonymous';
+        
+        const res = await fetch(`${opencodeAPI}/opencode/stream?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}&userId=${userId}&recordId=test-${Date.now()}`, {
           headers: { 'Authorization': 'Bearer ' + token }
         });
 
@@ -730,6 +750,24 @@
           errorDetailItem.className = 'log-item';
           errorDetailItem.textContent = JSON.stringify(errorData, null, 2);
           output.appendChild(errorDetailItem);
+          
+          // Handle 429 - Process already running
+          if (res.status === 429 && errorData.action === 'cancel_or_wait') {
+            const runtime = Math.round(errorData.runtime / 1000);
+            const cancelItem = document.createElement('div');
+            cancelItem.className = 'log-item';
+            cancelItem.innerHTML = `
+              <div style="margin-top: 10px;">
+                ⚠️ Ein Prozess läuft bereits seit ${runtime}s
+                <button class="btn btn-danger" style="margin-left: 10px;" onclick="cancelOpenCodeProcess('${userId}')">
+                  <i data-feather="x"></i> Prozess abbrechen
+                </button>
+              </div>
+            `;
+            output.appendChild(cancelItem);
+            feather.replace();
+          }
+          
           return;
         }
 
@@ -756,6 +794,35 @@
         errorItem.textContent = `❌ Error: ${e.message}`;
         output.appendChild(errorItem);
         log('❌ Live-Test Error: ' + e.message);
+      }
+    }
+
+    // Cancel OpenCode process
+    async function cancelOpenCodeProcess(userId) {
+      log(`🛑 Cancelling process for user ${userId}...`);
+      
+      try {
+        const res = await fetch(`${opencodeAPI}/opencode/cancel?userId=${userId}`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          log(`✅ Process cancelled: ${data.message}`);
+          
+          // Update UI
+          const output = document.getElementById('live-output');
+          const cancelledItem = document.createElement('div');
+          cancelledItem.className = 'log-item';
+          cancelledItem.textContent = '✅ Prozess erfolgreich abgebrochen';
+          output.appendChild(cancelledItem);
+        } else {
+          const error = await res.json();
+          log(`❌ Cancel failed: ${error.error}`);
+        }
+      } catch (e) {
+        log(`❌ Cancel error: ${e.message}`);
       }
     }
 

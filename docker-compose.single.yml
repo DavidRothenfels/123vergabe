@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.combined
+    ports:
+      - "8090:8090"
+      - "3001:3001"
+    volumes:
+      - ./pb_hooks:/app/pb_hooks
+      - ./pb_migrations:/app/pb_migrations
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped

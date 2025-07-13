@@ -1,6 +1,10 @@
 # Vergabedokument-Generator Project
 
 deployment: pocketbase file  und datenbank aus pb_data über github container build (action) an coolify
+kopiere immer pb file und pb datenbank direkt aus dem codebase
+fixe die db immer local per sqlite nicht per migration
+wenn create record feler in pb dann sage dem nutzer er soll in pb logs schauen
+
 ## Versionen
 nutze opencode, docs hier https://opencode.ai/docs/config/, repo hier https://github.com/sst/opencode
 nutze pocketbase v0.28.4 //
@@ -19,7 +23,9 @@ PocketBase JavaScript-Hooks haben keine Browser/Node.js APIs: setTimeout/setInte
 Hinweis zur Filter-Syntax keine Leerzeichen um die Operatoren, Filter ohne Leerzeichen
 unter /pb_data kann die datenbank mit sqlite2 pb_data geändert werden
 
-openai Model: gpt-4.1-mini
+## opencode hinweise
+nutze openai gpt-4.1-mini als modell
+OpenCode requires a TTY to output properly
 
 ## Project Overview
 Automated German procurement document generation using AI integration with PocketBase backend and real-time frontend.

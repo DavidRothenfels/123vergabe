@@ -1,0 +1,14 @@
+# Coolify Configuration
+# These environment variables will be set by Coolify
+
+# Required environment variables:
+# - OPENAI_API_KEY: Your OpenAI API key
+# - SERVICE_FQDN: The domain assigned by Coolify
+
+# The services will be available at:
+# - PocketBase: https://your-domain.com/
+# - OpenCode API: https://your-domain.com/opencode-api/
+
+# Health checks:
+# - PocketBase: /api/health
+# - OpenCode: /opencode-api/health

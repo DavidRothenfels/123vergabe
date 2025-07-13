@@ -9,37 +9,36 @@ const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = 3001;
 
-// CORS für alle Origins erlauben
+// User-Lock System
+const userProcesses = new Map();
+
+// CORS with explicit settings
 app.use(cors({
-  origin: '*',
+  origin: true, // Allow all origins
+  credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Type']
 }));
 
 app.use(express.json());
 
-// PocketBase DB für Updates
+// Database
 const db = new sqlite3.Database('./pb_data/data.db');
 
-// Function to get user's API key from PocketBase with security check
+// Get user's API key
 async function getUserApiKey(userId, authenticatedUserId = null) {
   try {
-    // 🔒 SICHERHEITSPRÜFUNG: User kann nur eigene API-Keys abfragen
     if (authenticatedUserId && userId !== authenticatedUserId) {
       console.log(`🚨 Security violation: User ${authenticatedUserId} tried to access API key for user ${userId}`);
       throw new Error('Unauthorized: Cannot access API key for different user');
     }
     
-    // Validierung: User-ID muss vorhanden sein
     if (!userId || userId === 'anonymous') {
       console.log(`⚠️ Invalid userId: ${userId}`);
       return null;
     }
     
-    // SECURITY: No hardcoded fallbacks for specific users
-    // All users must store their own API keys in the database
-    
-    // Datenbank-Zugriff mit Sicherheitsprüfung für andere User
     return new Promise((resolve, reject) => {
       db.get(
         `SELECT api_key FROM apikeys WHERE user_id = ? AND active = 1 ORDER BY updated DESC LIMIT 1`,
@@ -49,7 +48,7 @@ async function getUserApiKey(userId, authenticatedUserId = null) {
             console.log(`❌ DB Error getting API key for user ${userId}:`, err);
             reject(err);
           } else if (row && row.api_key) {
-            console.log(`🔑 Authorized access: Found API key for user ${userId}: ${row.api_key.substring(0, 8)}...`);
+            console.log(`🔑 Found API key for user ${userId}: ${row.api_key.substring(0, 8)}...`);
             resolve(row.api_key);
           } else {
             console.log(`⚠️ No API key found for user ${userId}`);
@@ -59,11 +58,12 @@ async function getUserApiKey(userId, authenticatedUserId = null) {
       );
     });
   } catch (error) {
-    console.log(`❌ getUserApiKey security error:`, error.message);
-    throw error; // Werfe Sicherheitsfehler weiter
+    console.log(`❌ getUserApiKey error:`, error.message);
+    throw error;
   }
 }
 
+// Main endpoint
 app.get('/opencode/stream', async (req, res) => {
   const { prompt, model, userId, userKey, recordId, projectId } = req.query;
 
@@ -71,35 +71,44 @@ app.get('/opencode/stream', async (req, res) => {
     return res.status(400).json({ error: 'Prompt und userId erforderlich' });
   }
 
+  // Check user lock
+  if (userProcesses.has(userId)) {
+    const runningProcess = userProcesses.get(userId);
+    const runtime = Date.now() - runningProcess.startTime;
+    console.log(`🚫 User ${userId}: Request blocked - already running (${Math.round(runtime/1000)}s)`);
+    return res.status(429).json({ 
+      error: 'Request already in progress',
+      runtime: runtime,
+      recordId: runningProcess.recordId
+    });
+  }
+
   console.log(`🎯 OpenCode Request: User ${userId}, Prompt: "${prompt.substring(0, 50)}..."`);
 
-  // Get API key: userKey > PocketBase > Environment
+  // Get API key
   let apiKey = userKey;
   
   if (!apiKey && userId !== 'anonymous') {
     try {
-      console.log(`🔍 Fetching API key for user ${userId}...`);
-      // 🔒 SICHERHEITSPRÜFUNG: Verwende userId als authenticatedUserId 
-      // (da er bereits durch PocketBase-Auth validiert wurde)
       apiKey = await getUserApiKey(userId, userId);
-      console.log(`🔑 API key result: ${apiKey ? 'found' : 'not found'}`);
     } catch (error) {
-      console.log(`❌ Error fetching user API key:`, error.message);
-      // Bei Sicherheitsfehlern: Request abbrechen
       if (error.message.includes('Unauthorized')) {
-        return res.status(403).json({ 
-          error: 'Forbidden: Unauthorized access to API key' 
-        });
+        return res.status(403).json({ error: 'Forbidden' });
       }
     }
   }
   
   if (!apiKey) {
     apiKey = process.env.OPENAI_API_KEY;
-    console.log(`🔄 Fallback to env API key: ${apiKey ? 'found' : 'not found'}`);
   }
 
-  // Setup: isoliertes Verzeichnis pro User
+  if (!apiKey) {
+    return res.status(400).json({ 
+      error: 'OpenAI API key required' 
+    });
+  }
+
+  // Setup environment
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), `oc-${userId}-`));
   const env = {
     ...process.env,
@@ -107,343 +116,193 @@ app.get('/opencode/stream', async (req, res) => {
     OPENAI_API_KEY: apiKey,
   };
 
-  // Check for API key
-  if (!env.OPENAI_API_KEY || env.OPENAI_API_KEY === 'REPLACE_WITH_YOUR_OPENAI_API_KEY' || env.OPENAI_API_KEY === 'your-openai-api-key-here' || env.OPENAI_API_KEY === 'DOCKER_PLACEHOLDER_KEY') {
-    console.log(`❌ User ${userId}: No valid API key available (key: ${env.OPENAI_API_KEY || 'none'})`);
-    return res.status(400).json({ 
-      error: 'OpenAI API key required. Please add your API key in the dashboard or set OPENAI_API_KEY environment variable.' 
-    });
-  }
-
-  // Smart prompt enhancement based on request type
-  let finalPrompt = prompt;
-  
-  // Only add extensive requirements for document generation requests
-  const isDocumentRequest = prompt.toLowerCase().includes('ausschreibung') || 
-                          prompt.toLowerCase().includes('leistungsbeschreibung') ||
+  // Enhance prompt
+  const isDocumentRequest = prompt.toLowerCase().includes('leistungsbeschreibung') || 
                           prompt.toLowerCase().includes('dokument') ||
-                          prompt.toLowerCase().includes('beschreibung') ||
                           prompt.length > 50;
   
+  let finalPrompt = prompt;
   if (isDocumentRequest) {
-    finalPrompt = prompt + `
-
-ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
-1. START IMMEDIATELY with document content - NO introductory text, NO questions, NO clarifications
-2. Generate COMPLETE document in German Markdown format
-3. NEVER ask "Welche spezifischen Aspekte..." or "Möchten Sie..." or similar questions
-4. NEVER say "Ich helfe gerne..." or "Benötigen Sie weitere..." or offer additional help
-5. DO NOT request more information - work with what is provided
-6. DO NOT ask about format, length, or structure - follow the given template
-7. BEGIN directly with "# [Document Title]" and continue with full content
-8. FORBIDDEN phrases: "Gerne helfe ich", "Welche weiteren", "Möchten Sie", "Soll ich", "Können Sie mir"
-9. END the document when complete - NO follow-up offers or questions
-10. IGNORE any tendency to be conversational - be purely document-focused
-
-WRITE THE COMPLETE DOCUMENT NOW:`;
+    finalPrompt += `\n\nERSTELLE DAS DOKUMENT DIREKT. Keine Einleitung, keine Fragen. Beginne mit dem Inhalt.`;
   } else {
-    // For simple requests, just add basic instruction
-    finalPrompt = prompt + `
-
-Antworten Sie direkt und kurz auf Deutsch. Keine Rückfragen.`;
+    finalPrompt += `\n\nAntworte direkt auf Deutsch.`;
   }
 
-  // OpenCode args - use run command for headless operation
-  const args = ['run', finalPrompt];
+  // Start OpenCode
+  const modelName = model || 'openai/gpt-4o-mini';
+  const scriptCommand = `/usr/local/bin/opencode run "${finalPrompt.replace(/"/g, '\\"')}" --model ${modelName}`;
+  const args = ['-qc', scriptCommand, '/dev/null'];
   
-  console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
-  console.log(`🔑 API Key: ${env.OPENAI_API_KEY ? 'SET' : 'MISSING'}`);
+  console.log(`🚀 Starting OpenCode...`);
+  console.log(`📋 Command: script ${args.join(' ')}`);
   
-  const proc = spawn('opencode', args, { 
-    env,
-    stdio: ['pipe', 'pipe', 'pipe'] // Explicit stdio setup
+  const proc = spawn('script', args, { 
+    env: {
+      ...env,
+      PATH: '/usr/local/bin:/usr/bin:/bin'
+    },
+    stdio: ['pipe', 'pipe', 'pipe']
   });
 
-  // Streaming Response Setup
+  // Register process
+  userProcesses.set(userId, {
+    proc: proc,
+    res: res,
+    startTime: Date.now(),
+    recordId: recordId || 'unknown'
+  });
+
+  // Setup streaming
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   let fullOutput = '';
-
+  let captureMode = 'waiting'; // waiting, text-marker, direct-content, finished
+  
+  const processLine = (line, source) => {
+    // Remove ANSI codes for analysis
+    const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').trim();
+    
+    if (!cleanLine) return;
+    
+    // Debug log
+    console.log(`📝 ${source}: ${cleanLine.substring(0, 100)}`);
+    
+    // Check for different content patterns
+    if (captureMode === 'waiting') {
+      // Pattern 1: Text marker (for simple responses)
+      if (line.includes('|') && line.includes('Text')) {
+        captureMode = 'text-marker';
+        const match = cleanLine.match(/Text\s+(.+)$/);
+        if (match && match[1]) {
+          const content = match[1].trim();
+          fullOutput += content + '\n';
+          res.write(content + '\n');
+          console.log(`✅ Captured via Text marker: ${content.substring(0, 50)}`);
+        }
+        return;
+      }
+      
+      // Pattern 2: Direct markdown (for documents)
+      if (cleanLine.startsWith('#') || cleanLine.startsWith('##')) {
+        captureMode = 'direct-content';
+        fullOutput += cleanLine + '\n';
+        res.write(cleanLine + '\n');
+        console.log(`✅ Captured markdown header: ${cleanLine.substring(0, 50)}`);
+        return;
+      }
+      
+      // Pattern 3: Could be part of prompt echo, skip common UI elements
+      if (cleanLine.includes('▄') || cleanLine.includes('█') || 
+          cleanLine.startsWith('>') || cleanLine.startsWith('@') ||
+          cleanLine.includes('ABSOLUTE REQUIREMENTS')) {
+        return;
+      }
+    }
+    
+    // In capture mode
+    if (captureMode === 'text-marker' || captureMode === 'direct-content') {
+      // Check for end markers
+      if (cleanLine.includes('[✔') || cleanLine.includes('Fertig!') || 
+          cleanLine.includes('User') && cleanLine.includes('-')) {
+        captureMode = 'finished';
+        console.log(`🏁 End marker found`);
+        return;
+      }
+      
+      // Skip UI elements
+      if (cleanLine.includes('▄') || cleanLine.includes('█') || 
+          cleanLine.includes('░') || cleanLine.startsWith('|')) {
+        return;
+      }
+      
+      // Capture content
+      if (cleanLine) {
+        fullOutput += cleanLine + '\n';
+        res.write(cleanLine + '\n');
+        console.log(`✅ Captured content: ${cleanLine.substring(0, 50)}`);
+      }
+    }
+  };
+  
+  // Process streams
   proc.stdout.on('data', chunk => {
-    const txt = chunk.toString();
-    fullOutput += txt;
-    res.write(txt);
-    console.log(`📤 User ${userId}:`, txt.substring(0, 100));
+    const lines = chunk.toString().split(/\r?\n|\r/);
+    lines.forEach(line => processLine(line, 'STDOUT'));
   });
-
+  
   proc.stderr.on('data', chunk => {
-    const txt = chunk.toString();
-    // Filter out OpenCode UI elements and normal output
-    if (!txt.includes('█▀▀█') && !txt.includes('█░░█') && !txt.includes('▀▀▀▀') && 
-        !txt.includes('openai/') && !txt.includes('Text') && !txt.includes('|') &&
-        !txt.trim().startsWith('>') && !txt.trim().startsWith('@')) {
-      fullOutput += '\n[ERR] ' + txt;
-      res.write('[ERR] ' + txt);
-      console.log(`❌ User ${userId} Error:`, txt);
-    }
-    // Treat stderr as normal output for OpenCode (it outputs content via stderr)
-    else if (txt.trim() && !txt.includes('█')) {
-      fullOutput += txt;
-      res.write(txt);
-      console.log(`📤 User ${userId} (stderr):`, txt.substring(0, 100));
-    }
+    const lines = chunk.toString().split(/\r?\n|\r/);
+    lines.forEach(line => processLine(line, 'STDERR'));
   });
 
+  // Handle process end
   proc.on('close', (code) => {
-    console.log(`✅ User ${userId} finished with code ${code}`);
+    console.log(`🏁 Process finished with code ${code}`);
+    console.log(`📊 Total captured: ${fullOutput.length} chars`);
     
     // Cleanup
-    fs.rmSync(tmpHome, { recursive: true, force: true });
+    userProcesses.delete(userId);
+    try {
+      fs.rmSync(tmpHome, { recursive: true, force: true });
+    } catch (e) {}
 
-    // Content validation function - adjusted for request type
-    const isValidDocument = (content) => {
-      const lowerContent = content.toLowerCase();
-      
-      // Check for signs of incomplete/questioning responses
-      const invalidPhrases = [
-        'welche spezifischen aspekte',
-        'welche informationen benötigen sie',
-        'können sie weitere details',
-        'möchten sie',
-        'brauchen sie weitere',
-        'ich benötige weitere informationen',
-        'um ihnen besser helfen zu können',
-        'könnten sie mir mitteilen',
-        'gerne helfe ich',
-        'welche weiteren',
-        'soll ich',
-        'können sie mir',
-        'falls sie weitere',
-        'wenn sie mehr',
-        'ich helfe ihnen gerne',
-        'what specific aspects',
-        'could you provide',
-        'i need more information',
-        'would you like me to',
-        'can you tell me more',
-        'i\'d be happy to help',
-        'how can i assist',
-        'let me know if you need'
-      ];
-      
-      // Check if content contains questioning phrases
-      if (invalidPhrases.some(phrase => lowerContent.includes(phrase))) {
-        console.log('❌ Content contains questioning phrases - not saving');
-        return false;
-      }
-      
-      // Adjusted validation based on request type
-      if (isDocumentRequest) {
-        // For documents: stricter validation
-        if (content.length < 500) {
-          console.log('❌ Document too short - not saving');
-          return false;
-        }
-        
-        if (!content.includes('#') && !content.includes('##')) {
-          console.log('❌ Document lacks proper structure - not saving');
-          return false;
-        }
-      } else {
-        // For simple requests: more lenient validation
-        if (content.length < 10) {
-          console.log('❌ Response too short - not saving');
-          return false;
-        }
-      }
-      
-      return true;
-    };
-
-    // Nur speichern wenn OpenCode erfolgreich war UND Content vorhanden und valid ist
-    if (code === 0 && fullOutput.trim() && !fullOutput.includes('[ERR]') && isValidDocument(fullOutput.trim())) {
-      // Ergebnis in PocketBase DB speichern
-      if (recordId && projectId) {
-        // Automatisch als Dokument speichern wenn projectId vorhanden
-        const docTitle = `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`;
-        
-        db.run(
-          `INSERT INTO documents (title, content, project_id, user_id, document_type, generated_by_ai, created, updated) 
-           VALUES (?, ?, ?, ?, 'leistungsbeschreibung', 1, datetime('now'), datetime('now'))`,
-          [docTitle, fullOutput.trim(), projectId, userId],
-          (err) => {
-            if (err) console.log('DB Document Insert Error:', err);
-            else console.log(`💾 Saved document for project ${projectId}`);
-          }
-        );
-      } else if (recordId) {
-        // Fallback: Create document in documents collection
-        db.run(
-          `INSERT INTO documents (id, title, content, request_id, type, created_by, created, updated) 
-           VALUES (?, ?, ?, ?, 'leistung', ?, datetime('now'), datetime('now'))`,
-          [recordId, `AI-Generiert: ${new Date().toLocaleDateString('de-DE')}`, fullOutput.trim(), recordId, userId],
-          (err) => {
-            if (err) console.log('DB Document Insert Error:', err);
-            else console.log(`💾 Saved document for record ${recordId}`);
-          }
-        );
-      }
+    // Don't save to database - let frontend handle it
+    const cleanedOutput = fullOutput.trim();
+    
+    if (code === 0 && cleanedOutput.length > 20) {
+      console.log(`✅ Generation completed successfully (${cleanedOutput.length} chars)`);
     } else {
-      const hasContent = !!fullOutput.trim();
-      const hasError = fullOutput.includes('[ERR]');
-      const isValid = hasContent ? isValidDocument(fullOutput.trim()) : false;
-      
-      console.log(`❌ User ${userId}: Not saving document - Code: ${code}, HasContent: ${hasContent}, HasError: ${hasError}, IsValid: ${isValid}`);
-      
-      if (hasContent && !isValid) {
-        console.log(`❌ Document content preview: "${fullOutput.trim().substring(0, 200)}..."`);
-      }
+      console.log(`⚠️ Generation issue: code=${code}, length=${cleanedOutput.length}`);
     }
 
-    res.end(`\n\n[✔ User ${userId} - Fertig!]`);
+    res.end();
   });
 
   proc.on('error', (error) => {
-    console.log(`💥 User ${userId} Process Error:`, error.message);
+    console.log(`💥 Process Error:`, error.message);
+    userProcesses.delete(userId);
     res.write(`\n[ERROR] ${error.message}`);
     res.end();
   });
 });
 
-// API Key Save Endpoint
-app.post('/save-key', async (req, res) => {
-  const { userId, apiKey } = req.query;
+// Other endpoints
+app.post('/opencode/cancel', (req, res) => {
+  const { userId } = req.query;
   
-  if (!userId || !apiKey) {
-    return res.status(400).json({ error: 'userId and apiKey are required' });
+  if (!userId || !userProcesses.has(userId)) {
+    return res.status(404).json({ error: 'No running process' });
   }
   
-  console.log(`🔑 Saving API key for user ${userId}`);
-  
+  const userProcess = userProcesses.get(userId);
   try {
-    // Check if user already has an API key
-    const existing = await new Promise((resolve, reject) => {
-      db.get(`SELECT id FROM apikeys WHERE user_id = ? LIMIT 1`, [userId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-    
-    if (existing) {
-      // Update existing
-      await new Promise((resolve, reject) => {
-        db.run(`UPDATE apikeys SET api_key = ?, updated = datetime('now') WHERE user_id = ?`, [apiKey, userId], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-      console.log(`✅ Updated API key for user ${userId}`);
-    } else {
-      // Insert new
-      await new Promise((resolve, reject) => {
-        db.run(`INSERT INTO apikeys (user_id, provider, api_key, name, active, created, updated) VALUES (?, 'openai', ?, 'Auto-saved', 1, datetime('now'), datetime('now'))`, [userId, apiKey], (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-      console.log(`✅ Inserted new API key for user ${userId}`);
-    }
-    
-    res.json({ message: 'API key saved successfully', userId: userId });
+    userProcess.proc.kill('SIGTERM');
+    userProcesses.delete(userId);
+    res.json({ message: 'Cancelled' });
   } catch (error) {
-    console.log(`❌ Error saving API key:`, error);
-    res.status(500).json({ error: 'Failed to save API key' });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// API Key Load Endpoint with security check
-app.get('/load-key', async (req, res) => {
-  const { userId, authenticatedUserId } = req.query;
-  
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-  
-  console.log(`🔍 Loading API key for user ${userId}`);
-  
-  try {
-    // 🔒 SICHERHEITSPRÜFUNG: Prüfe ob User berechtigt ist
-    const apiKey = await getUserApiKey(userId, authenticatedUserId || userId);
-    
-    if (apiKey) {
-      console.log(`✅ Authorized: Found API key for user ${userId}`);
-      res.json({ key: apiKey, userId: userId });
-    } else {
-      console.log(`⚠️ No API key found for user ${userId}`);
-      res.json({ key: null, userId: userId });
-    }
-  } catch (error) {
-    console.log(`❌ Error loading API key:`, error.message);
-    
-    // Bei Sicherheitsfehlern: 403 Forbidden
-    if (error.message.includes('Unauthorized')) {
-      return res.status(403).json({ error: 'Forbidden: Unauthorized access to API key' });
-    }
-    
-    res.status(500).json({ error: 'Failed to load API key' });
-  }
-});
-
-// Health Check mit CORS Headers
 app.get('/health', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.json({ status: 'OpenCode Service läuft', port: PORT });
+  res.json({ status: 'OK', port: PORT });
 });
 
-// OPTIONS für Preflight - spezifische Routes
-app.options('/health', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.sendStatus(200);
+// Start server
+const server = app.listen(PORT, () => {
+  console.log(`🚀 OpenCode Service on port ${PORT}`);
+  console.log(`🔗 http://localhost:${PORT}/opencode/stream`);
 });
 
-app.options('/opencode/stream', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.sendStatus(200);
-});
-
-// Graceful shutdown handler
+// Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  process.exit(0);
+  console.log('Shutting down...');
+  server.close(() => process.exit(0));
 });
 
 process.on('SIGINT', () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('💥 Uncaught Exception:', err);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-const server = app.listen(PORT, () => {
-  console.log(`🚀 OpenCode Service läuft auf Port ${PORT}`);
-  console.log(`🔗 Endpoint: http://127.0.0.1:${PORT}/opencode/stream`);
-  console.log(`❤️  Health: http://127.0.0.1:${PORT}/health`);
-});
-
-// Handle server errors
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} ist bereits belegt. Stoppe andere Prozesse und versuche erneut.`);
-    process.exit(1);
-  } else {
-    console.error('❌ Server error:', err);
-    process.exit(1);
-  }
+  console.log('Shutting down...');
+  server.close(() => process.exit(0));
 });

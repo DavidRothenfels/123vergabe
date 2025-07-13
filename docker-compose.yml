@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  pocketbase:
+    build: .
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./pb_data:/pb_data
+      - ./pb_public:/pb_public
+      - ./pb_hooks:/pb_hooks
+      - ./pb_migrations:/pb_migrations
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERVICE_FQDN_POCKETBASE=/
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pocketbase.rule=Host(`${SERVICE_FQDN}`) && PathPrefix(`/`)"
+      - "traefik.http.services.pocketbase.loadbalancer.server.port=8090"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  opencode-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile.opencode
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./pb_data:/app/pb_data:ro  # Read-only access to PocketBase data
+    environment:
+      - NODE_ENV=production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SERVICE_FQDN_OPENCODE=/opencode-api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opencode.rule=Host(`${SERVICE_FQDN}`) && PathPrefix(`/opencode-api`)"
+      - "traefik.http.services.opencode.loadbalancer.server.port=3001"
+      - "traefik.http.middlewares.opencode-stripprefix.stripprefix.prefixes=/opencode-api"
+      - "traefik.http.routers.opencode.middlewares=opencode-stripprefix"
+    depends_on:
+      - pocketbase
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
