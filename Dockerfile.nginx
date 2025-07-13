@@ -1,0 +1,70 @@
+# Multi-stage Dockerfile with Nginx reverse proxy
+FROM node:20-alpine AS base
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    sqlite \
+    jq \
+    nginx \
+    supervisor \
+    && rm -rf /var/cache/apk/*
+
+# Install PM2 for process management and OpenCode for headless operation
+RUN npm install -g pm2 opencode-ai@latest
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files for dependencies
+COPY package*.json ./
+
+# Install Node.js dependencies
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Copy the pre-built PocketBase binary directly
+COPY pocketbase ./pocketbase
+RUN chmod +x ./pocketbase
+
+# Copy all PocketBase data (databases, storage, etc.)
+COPY pb_data/ ./pb_data/
+COPY pb_hooks/ ./pb_hooks/
+COPY pb_public/ ./pb_public/
+COPY pb_migrations/ ./pb_migrations/
+
+# Copy application files
+COPY *.js ./
+COPY *.sh ./
+COPY *.json ./
+RUN chmod +x ./*.sh
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/http.d/default.conf
+
+# Copy supervisord configuration
+COPY supervisord-nginx.conf /etc/supervisord.conf
+
+# Set environment for headless operation
+ENV DISPLAY=
+ENV NO_GUI=1
+
+# Create necessary directories
+RUN mkdir -p pb_data pb_logs temp /var/log/supervisor /run/nginx
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV POCKETBASE_URL=http://localhost:8090
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Expose only port 80 (nginx will proxy to internal services)
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Start all services with supervisord
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisord.conf"]
