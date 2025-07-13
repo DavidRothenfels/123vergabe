@@ -163,3 +163,17 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
       continue-on-error: true
+
+  deploy-coolify:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    
+    steps:
+    - name: Trigger Coolify Deployment
+      run: |
+        echo "🚀 Triggering Coolify deployment..."
+        curl -X GET "https://app.coolify.io/api/v1/deploy?uuid=o0owo080gg840wkkkgws0ckc&force=false" \
+          -H "Authorization: Bearer ${{ secrets.COOLIFY_WEBHOOK_TOKEN }}" \
+          -w "\nHTTP Status: %{http_code}\n"
+      continue-on-error: true

@@ -1,5 +1,14 @@
 # Coolify Setup Guide
 
+## ⚠️ WICHTIG: Dockerfile ändern!
+
+In Coolify musst du das **Dockerfile Location** Field ändern zu:
+```
+/Dockerfile.nginx
+```
+
+Dies verwendet unser Nginx-basiertes Dockerfile statt dem Standard-Dockerfile.
+
 ## Option 1: Docker Compose (Empfohlen)
 
 1. **Build Pack ändern**: 
