@@ -115,12 +115,22 @@ app.get('/opencode/stream', async (req, res) => {
     });
   }
 
-  // Enhanced prompt to ensure complete document generation
-  const finalPrompt = prompt + `
+  // Smart prompt enhancement based on request type
+  let finalPrompt = prompt;
+  
+  // Only add extensive requirements for document generation requests
+  const isDocumentRequest = prompt.toLowerCase().includes('ausschreibung') || 
+                          prompt.toLowerCase().includes('leistungsbeschreibung') ||
+                          prompt.toLowerCase().includes('dokument') ||
+                          prompt.toLowerCase().includes('beschreibung') ||
+                          prompt.length > 50;
+  
+  if (isDocumentRequest) {
+    finalPrompt = prompt + `
 
 ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
 1. START IMMEDIATELY with document content - NO introductory text, NO questions, NO clarifications
-2. Generate COMPLETE 2000+ word document in German Markdown format
+2. Generate COMPLETE document in German Markdown format
 3. NEVER ask "Welche spezifischen Aspekte..." or "Möchten Sie..." or similar questions
 4. NEVER say "Ich helfe gerne..." or "Benötigen Sie weitere..." or offer additional help
 5. DO NOT request more information - work with what is provided
@@ -131,6 +141,12 @@ ABSOLUTE REQUIREMENTS - NO EXCEPTIONS:
 10. IGNORE any tendency to be conversational - be purely document-focused
 
 WRITE THE COMPLETE DOCUMENT NOW:`;
+  } else {
+    // For simple requests, just add basic instruction
+    finalPrompt = prompt + `
+
+Antworten Sie direkt und kurz auf Deutsch. Keine Rückfragen.`;
+  }
 
   // OpenCode args - use run command for headless operation
   const args = ['run', finalPrompt];
@@ -181,7 +197,7 @@ WRITE THE COMPLETE DOCUMENT NOW:`;
     // Cleanup
     fs.rmSync(tmpHome, { recursive: true, force: true });
 
-    // Content validation function
+    // Content validation function - adjusted for request type
     const isValidDocument = (content) => {
       const lowerContent = content.toLowerCase();
       
@@ -218,16 +234,24 @@ WRITE THE COMPLETE DOCUMENT NOW:`;
         return false;
       }
       
-      // Check minimum content length (should be substantial document)
-      if (content.length < 1000) {
-        console.log('❌ Content too short - not saving');
-        return false;
-      }
-      
-      // Check for markdown headers (indicates structured document)
-      if (!content.includes('#') && !content.includes('##')) {
-        console.log('❌ Content lacks proper structure - not saving');
-        return false;
+      // Adjusted validation based on request type
+      if (isDocumentRequest) {
+        // For documents: stricter validation
+        if (content.length < 500) {
+          console.log('❌ Document too short - not saving');
+          return false;
+        }
+        
+        if (!content.includes('#') && !content.includes('##')) {
+          console.log('❌ Document lacks proper structure - not saving');
+          return false;
+        }
+      } else {
+        // For simple requests: more lenient validation
+        if (content.length < 10) {
+          console.log('❌ Response too short - not saving');
+          return false;
+        }
       }
       
       return true;
