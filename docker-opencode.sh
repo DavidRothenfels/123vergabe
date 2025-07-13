@@ -80,9 +80,18 @@ JSON_PAYLOAD=$(jq -n \
     --arg prompt "$PROMPT" \
     '{
         model: $model,
-        messages: [{role: "user", content: $prompt}],
+        messages: [
+            {
+                role: "system", 
+                content: "You are a German procurement expert. Generate complete, detailed documents immediately without asking questions. Always provide the full document as requested."
+            },
+            {
+                role: "user", 
+                content: $prompt
+            }
+        ],
         max_tokens: 4000,
-        temperature: 0.7
+        temperature: 0.3
     }')
 
 RESPONSE=$(curl -s -H "Authorization: Bearer $OPENAI_API_KEY" \

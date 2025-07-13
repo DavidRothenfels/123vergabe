@@ -127,8 +127,19 @@ app.get('/opencode/stream', async (req, res) => {
     args.push('--model', 'openai/gpt-4o-mini');
   }
   
-  // Modify prompt to prevent follow-up questions
-  const finalPrompt = prompt + "\n\nIMPORTANT: Provide a complete answer without asking follow-up questions. Do not ask if I want additional details or expansions.";
+  // Modify prompt to prevent follow-up questions and ensure complete output
+  const finalPrompt = prompt + `
+
+CRITICAL INSTRUCTIONS:
+1. Generate the COMPLETE document immediately - no questions, no clarifications, no requests for more information
+2. Start writing the document content RIGHT NOW - do not ask what I want or need
+3. Use the provided description and create a full, detailed document
+4. Do NOT ask follow-up questions like "What specific aspects would you like me to focus on?"
+5. Do NOT say things like "I'd be happy to help" or "Would you like me to..."
+6. Generate the complete document based on the requirements given
+7. Output must be in Markdown format and at least 2000 words
+8. Begin immediately with the document content`;
+  
   args.push(finalPrompt);
   
   console.log(`🚀 Starting OpenCode: opencode ${args.join(' ')}`);
@@ -177,8 +188,52 @@ app.get('/opencode/stream', async (req, res) => {
     // Cleanup
     fs.rmSync(tmpHome, { recursive: true, force: true });
 
-    // Nur speichern wenn OpenCode erfolgreich war UND Content vorhanden ist
-    if (code === 0 && fullOutput.trim() && !fullOutput.includes('[ERR]')) {
+    // Content validation function
+    const isValidDocument = (content) => {
+      const lowerContent = content.toLowerCase();
+      
+      // Check for signs of incomplete/questioning responses
+      const invalidPhrases = [
+        'welche spezifischen aspekte',
+        'welche informationen benötigen sie',
+        'können sie weitere details',
+        'möchten sie',
+        'brauchen sie weitere',
+        'ich benötige weitere informationen',
+        'um ihnen besser helfen zu können',
+        'könnten sie mir mitteilen',
+        'what specific aspects',
+        'could you provide',
+        'i need more information',
+        'would you like me to',
+        'can you tell me more',
+        'i\'d be happy to help',
+        'how can i assist'
+      ];
+      
+      // Check if content contains questioning phrases
+      if (invalidPhrases.some(phrase => lowerContent.includes(phrase))) {
+        console.log('❌ Content contains questioning phrases - not saving');
+        return false;
+      }
+      
+      // Check minimum content length (should be substantial document)
+      if (content.length < 1000) {
+        console.log('❌ Content too short - not saving');
+        return false;
+      }
+      
+      // Check for markdown headers (indicates structured document)
+      if (!content.includes('#') && !content.includes('##')) {
+        console.log('❌ Content lacks proper structure - not saving');
+        return false;
+      }
+      
+      return true;
+    };
+
+    // Nur speichern wenn OpenCode erfolgreich war UND Content vorhanden und valid ist
+    if (code === 0 && fullOutput.trim() && !fullOutput.includes('[ERR]') && isValidDocument(fullOutput.trim())) {
       // Ergebnis in PocketBase DB speichern
       if (recordId && projectId) {
         // Automatisch als Dokument speichern wenn projectId vorhanden
@@ -206,7 +261,15 @@ app.get('/opencode/stream', async (req, res) => {
         );
       }
     } else {
-      console.log(`❌ User ${userId}: Not saving document due to error (code: ${code}, hasContent: ${!!fullOutput.trim()}, hasError: ${fullOutput.includes('[ERR]')})`);
+      const hasContent = !!fullOutput.trim();
+      const hasError = fullOutput.includes('[ERR]');
+      const isValid = hasContent ? isValidDocument(fullOutput.trim()) : false;
+      
+      console.log(`❌ User ${userId}: Not saving document - Code: ${code}, HasContent: ${hasContent}, HasError: ${hasError}, IsValid: ${isValid}`);
+      
+      if (hasContent && !isValid) {
+        console.log(`❌ Document content preview: "${fullOutput.trim().substring(0, 200)}..."`);
+      }
     }
 
     res.end(`\n\n[✔ User ${userId} - Fertig!]`);
