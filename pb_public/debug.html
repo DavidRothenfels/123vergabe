@@ -448,16 +448,10 @@
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       // Local development: OpenCode runs on separate port
       opencodeAPI = `http://${window.location.hostname}:3001`;
-    } else if (window.location.pathname.includes('/pb_public/')) {
-      // Production with path-based routing (e.g., domain.com/opencode/)
-      // Assume OpenCode is proxied through the same domain
-      opencodeAPI = window.location.origin.replace('/pb_public', '') + '/opencode-api';
     } else {
-      // Production: Try subdomain or path-based approach
-      // Option 1: Subdomain (e.g., opencode.domain.com)
-      // Option 2: Same domain with /api prefix
-      // For now, assume it's proxied through PocketBase
-      opencodeAPI = `${baseURL}/opencode-api`;
+      // Production (Coolify): OpenCode is proxied through /opencode-api path on same domain
+      opencodeAPI = window.location.origin + '/opencode-api';
+      console.log('🔧 Production OpenCode URL:', opencodeAPI);
     }
     
     console.log('🔧 Debug URLs:', { baseURL, opencodeAPI });

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    environment:
+      # Coolify FQDN configuration for multiple ports
+      # Main app (PocketBase) on port 8090
+      - SERVICE_FQDN_8090
+      # OpenCode API on port 3001 with /opencode-api prefix
+      - SERVICE_FQDN_3001=/opencode-api
+      
+      # Application environment variables
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NODE_ENV=production
+      - POCKETBASE_URL=http://localhost:8090
+      - PORT=3001
+      
+    # Expose both ports
+    expose:
+      - "8090"
+      - "3001"
+      
+    volumes:
+      - pb_data:/app/pb_data
+      - pb_logs:/app/pb_logs
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  pb_data:
+    driver: local
+  pb_logs:
+    driver: local
