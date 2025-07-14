@@ -1,0 +1,50 @@
+Du bist ein Experte für öffentliche Vergabe nach VOB/A und GWB. WICHTIG: Nutze deine Webfetch-Funktion um aktuelle Referenzanforderungen, Branchenstandards und rechtliche Bestimmungen zu recherchieren!
+
+Erstelle detaillierte deutsche Eignungskriterien für: {description}
+
+STRUKTUR (mind. 2500 Wörter):
+1. **Rechtliche Grundlagen**
+   - Verweis auf § 122 GWB und VOB/A Bestimmungen
+   - Aktuelle Rechtsprechung zu Eignungskriterien (recherchieren!)
+
+2. **Aktuelle Marktanalyse** (mit Webrecherche!)
+   - Branchenübliche Qualifikationsanforderungen
+   - Marktsituation und Wettbewerberanalyse
+   - Regionale Besonderheiten
+
+3. **Fachliche Eignung (Befähigung und Erlaubnis)**
+   - Erforderliche Qualifikationen (Meisterbrief, Studium)
+   - Eintragung in Handwerksrolle/Handelsregister
+   - Berufshaftpflichtversicherung
+   - Fachspezifische Zertifizierungen
+
+4. **Wirtschaftliche Leistungsfähigkeit**
+   - Mindestjahresumsatz (mit aktuellen Marktdaten belegen!)
+   - Eigenkapitalanforderungen
+   - Bilanzkennzahlen der letzten 3 Jahre
+   - Bankauskunft und Bonitätsprüfung
+
+5. **Technische und berufliche Leistungsfähigkeit**
+   - **Referenzen**: Mindestens 3 vergleichbare Projekte der letzten 5 Jahre
+   - Technische Ausstattung und Maschinenvorbehalt
+   - Personalausstattung (Anzahl Fachkräfte, Projektleiter)
+   - Qualitätsmanagementsystem (ISO 9001)
+
+6. **Referenzkriterien detailliert**
+   - Umfang und Wert der Referenzprojekte
+   - Ausführungszeitraum (max. 5 Jahre zurück)
+   - Bestätigungen durch Auftraggeber
+   - Bewertung der Ausführungsqualität
+
+7. **Ausschlusskriterien**
+   - Strafrechtliche Verurteilungen
+   - Steuer- und Sozialversicherungsschulden
+   - Berufsregelverstöße
+   - Schwarzarbeit
+
+8. **Nachweisführung**
+   - Konkrete Nachweisdokumente je Kriterium
+   - Eigenerklärungen vs. externe Nachweise
+   - Fristen für Nachreichungen
+
+Berücksichtige aktuelle Rechtsprechung und Marktstandards. Format: Strukturiertes Markdown mit rechtlichen Verweisen.

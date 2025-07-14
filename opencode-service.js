@@ -128,9 +128,17 @@ app.get('/opencode/stream', async (req, res) => {
     finalPrompt += `\n\nAntworte direkt auf Deutsch.`;
   }
 
-  // Start OpenCode
+  // Start OpenCode - detect correct path based on environment
   const modelName = model || 'openai/gpt-4o-mini';
-  const scriptCommand = `/usr/local/bin/opencode run "${finalPrompt.replace(/"/g, '\\"')}" --model ${modelName}`;
+  
+  // Try to detect OpenCode path - check local installation first, then global
+  const fs = require('fs');
+  let opencodePath = '/usr/local/bin/opencode'; // Default for Docker/production
+  if (fs.existsSync('/home/dwr/.opencode/bin/opencode')) {
+    opencodePath = '/home/dwr/.opencode/bin/opencode'; // Local development
+  }
+  
+  const scriptCommand = `${opencodePath} run "${finalPrompt.replace(/"/g, '\\"')}" --model ${modelName}`;
   const args = ['-qc', scriptCommand, '/dev/null'];
   
   console.log(`🚀 Starting OpenCode...`);

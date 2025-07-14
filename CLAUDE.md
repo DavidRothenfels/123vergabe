@@ -24,7 +24,7 @@ Hinweis zur Filter-Syntax keine Leerzeichen um die Operatoren, Filter ohne Leerz
 unter /pb_data kann die datenbank mit sqlite2 pb_data geändert werden
 
 ## opencode hinweise
-nutze openai gpt-4.1-mini als modell
+nutze gpt-4.1-mini als modell
 OpenCode requires a TTY to output properly
 
 ## Project Overview

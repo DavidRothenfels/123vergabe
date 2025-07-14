@@ -1,0 +1,34 @@
+FROM node:18-slim
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    bash \
+    supervisor \
+    util-linux \
+    sqlite3 \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g opencode-ai@latest
+
+# Copy existing PocketBase binary from local
+COPY pocketbase /usr/local/bin/
+RUN chmod +x /usr/local/bin/pocketbase
+
+WORKDIR /app
+
+# Copy all files including pb_public with HTML files
+COPY . .
+
+# Install Node dependencies
+RUN npm ci --only=production || npm install --production
+
+# Create supervisor config
+RUN mkdir -p /etc/supervisor/conf.d
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose ports
+EXPOSE 8090 3001
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Frontend Test Suite</title>
+    <style>
+        :root {
+            --success: #28a745;
+            --error: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+            --primary: #007bff;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f8f9fa;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .test-controls {
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .test-results {
+            padding: 1.5rem;
+        }
+        
+        .test-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            border-left: 4px solid #ddd;
+        }
+        
+        .test-item.running {
+            background: #fff3cd;
+            border-left-color: var(--warning);
+        }
+        
+        .test-item.success {
+            background: #d4edda;
+            border-left-color: var(--success);
+        }
+        
+        .test-item.error {
+            background: #f8d7da;
+            border-left-color: var(--error);
+        }
+        
+        .test-status {
+            font-weight: bold;
+            margin-right: 1rem;
+            min-width: 60px;
+        }
+        
+        .test-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .test-duration {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin: 0.25rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        .summary {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 4px;
+            margin-bottom: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 1rem;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .summary-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .summary-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+        
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        
+        .config-section {
+            background: #e9ecef;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .config-section h3 {
+            margin-bottom: 0.5rem;
+            color: #495057;
+        }
+        
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            font-size: 0.875rem;
+        }
+        
+        .config-key {
+            font-weight: 500;
+        }
+        
+        .config-value {
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Frontend Test Suite</h1>
+            <p>Automatisierte Tests für das OpenCode Multiuser System</p>
+        </div>
+        
+        <div class="test-controls">
+            <button class="btn btn-primary" onclick="runAllTests()">🚀 Alle Tests ausführen</button>
+            <button class="btn btn-success" onclick="runQuickTests()">⚡ Schnelltests</button>
+            <button class="btn btn-danger" onclick="clearResults()">🗑️ Ergebnisse löschen</button>
+            
+            <div class="config-section">
+                <h3>Test-Konfiguration</h3>
+                <div class="config-item">
+                    <span class="config-key">Basis-URL:</span>
+                    <span class="config-value" id="baseUrl">https://cli.a-g-e-n-t.de</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-key">Test-User:</span>
+                    <span class="config-value">test@vergabe.de</span>
+                </div>
+                <div class="config-item">
+                    <span class="config-key">Browser:</span>
+                    <span class="config-value" id="browserInfo">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-results">
+            <div class="summary" id="summary" style="display: none;">
+                <div class="summary-item">
+                    <div class="summary-value" id="totalTests">0</div>
+                    <div class="summary-label">Gesamt</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="passedTests" style="color: var(--success);">0</div>
+                    <div class="summary-label">Erfolgreich</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="failedTests" style="color: var(--error);">0</div>
+                    <div class="summary-label">Fehlgeschlagen</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="testDuration">0ms</div>
+                    <div class="summary-label">Dauer</div>
+                </div>
+            </div>
+            
+            <div id="testContainer"></div>
+            
+            <div class="log-area" id="logArea"></div>
+        </div>
+    </div>
+
+    <script>
+        // Test Configuration
+        const CONFIG = {
+            baseURL: 'https://cli.a-g-e-n-t.de',
+            testUser: {
+                email: 'test@vergabe.de',
+                password: 'vergabe123'
+            },
+            timeout: 30000
+        };
+
+        // Test State
+        let testResults = [];
+        let testStartTime = 0;
+        let authToken = null;
+        let currentUserId = null;
+        let testProjectId = null;
+
+        // Initialize page
+        window.onload = function() {
+            updateBrowserInfo();
+            log('🚀 Frontend Test Suite geladen');
+        };
+
+        // Utility Functions
+        function log(message, level = 'INFO') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${level}: ${message}`;
+            
+            const logArea = document.getElementById('logArea');
+            logArea.innerHTML += logEntry + '\n';
+            logArea.scrollTop = logArea.scrollHeight;
+            
+            console.log(logEntry);
+        }
+
+        function updateBrowserInfo() {
+            const browserInfo = `${navigator.userAgent.split(' ')[0]} ${navigator.platform}`;
+            document.getElementById('browserInfo').textContent = browserInfo;
+        }
+
+        function clearResults() {
+            document.getElementById('testContainer').innerHTML = '';
+            document.getElementById('logArea').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            testResults = [];
+            log('🗑️ Test-Ergebnisse gelöscht');
+        }
+
+        function updateSummary() {
+            const total = testResults.length;
+            const passed = testResults.filter(r => r.status === 'success').length;
+            const failed = testResults.filter(r => r.status === 'error').length;
+            const duration = Date.now() - testStartTime;
+
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = failed;
+            document.getElementById('testDuration').textContent = duration + 'ms';
+            
+            document.getElementById('summary').style.display = 'block';
+        }
+
+        function addTestResult(name, status, duration, error = null) {
+            const result = { name, status, duration, error, timestamp: Date.now() };
+            testResults.push(result);
+
+            const container = document.getElementById('testContainer');
+            const testItem = document.createElement('div');
+            testItem.className = `test-item ${status}`;
+            
+            const statusIcon = status === 'success' ? '✅' : status === 'error' ? '❌' : '⚠️';
+            const statusText = status === 'success' ? 'PASS' : status === 'error' ? 'FAIL' : 'RUNNING';
+            
+            testItem.innerHTML = `
+                <div class="test-status">${statusIcon} ${statusText}</div>
+                <div class="test-name">${name}</div>
+                <div class="test-duration">${duration}ms</div>
+            `;
+            
+            if (error) {
+                testItem.title = error;
+            }
+            
+            container.appendChild(testItem);
+            updateSummary();
+        }
+
+        // Test Functions
+        async function runTest(name, testFunction) {
+            log(`🧪 Starte Test: ${name}`);
+            const startTime = Date.now();
+            
+            // Add running status
+            addTestResult(name, 'running', 0);
+            
+            try {
+                const result = await testFunction();
+                const duration = Date.now() - startTime;
+                
+                // Update to success
+                const testItems = document.querySelectorAll('.test-item');
+                const lastItem = testItems[testItems.length - 1];
+                lastItem.className = 'test-item success';
+                lastItem.querySelector('.test-status').innerHTML = '✅ PASS';
+                lastItem.querySelector('.test-duration').textContent = duration + 'ms';
+                
+                testResults[testResults.length - 1] = { name, status: 'success', duration, result };
+                
+                log(`✅ Test erfolgreich: ${name} (${duration}ms)`);
+                return result;
+                
+            } catch (error) {
+                const duration = Date.now() - startTime;
+                
+                // Update to error
+                const testItems = document.querySelectorAll('.test-item');
+                const lastItem = testItems[testItems.length - 1];
+                lastItem.className = 'test-item error';
+                lastItem.querySelector('.test-status').innerHTML = '❌ FAIL';
+                lastItem.querySelector('.test-duration').textContent = duration + 'ms';
+                lastItem.title = error.message;
+                
+                testResults[testResults.length - 1] = { name, status: 'error', duration, error: error.message };
+                
+                log(`❌ Test fehlgeschlagen: ${name} - ${error.message}`);
+                throw error;
+            }
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            const url = `${CONFIG.baseURL}${endpoint}`;
+            const defaultOptions = {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            const mergedOptions = { ...defaultOptions, ...options };
+            
+            if (authToken && !mergedOptions.headers.Authorization) {
+                mergedOptions.headers.Authorization = `Bearer ${authToken}`;
+            }
+
+            const response = await fetch(url, mergedOptions);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${data.message || 'Unknown error'}`);
+            }
+            
+            return data;
+        }
+
+        // Individual Tests
+        async function testUserLogin() {
+            const response = await apiCall('/api/collections/users/auth-with-password', {
+                method: 'POST',
+                body: JSON.stringify({
+                    identity: CONFIG.testUser.email,
+                    password: CONFIG.testUser.password
+                })
+            });
+
+            if (!response.token || !response.record) {
+                throw new Error('Login response missing token or record');
+            }
+
+            authToken = response.token;
+            currentUserId = response.record.id;
+            
+            return { userId: currentUserId, email: response.record.email };
+        }
+
+        async function testProjectCreation() {
+            const projectData = {
+                name: `Frontend Test ${Date.now()}`,
+                description: 'Projekt erstellt durch Frontend-Tests',
+                budget: 5000,
+                deadline: '2024-12-31',
+                eckpunkte: 'Automatisierte Frontend-Tests',
+                user_id: currentUserId,
+                request_id: `FE-TEST-${Date.now()}`
+            };
+
+            const response = await apiCall('/api/collections/projects/records', {
+                method: 'POST',
+                body: JSON.stringify(projectData)
+            });
+
+            if (!response.id || response.name !== projectData.name) {
+                throw new Error('Project creation failed');
+            }
+
+            testProjectId = response.id;
+            return response;
+        }
+
+        async function testApiKeySaving() {
+            const keyData = {
+                user_id: currentUserId,
+                provider: 'openai',
+                api_key: 'sk-frontend-test-key-12345',
+                name: 'Frontend Test Key',
+                active: true
+            };
+
+            const response = await apiCall('/api/collections/apikeys/records', {
+                method: 'POST',
+                body: JSON.stringify(keyData)
+            });
+
+            if (!response.id || response.provider !== 'openai') {
+                throw new Error('API key creation failed');
+            }
+
+            return response;
+        }
+
+        async function testPromptsList() {
+            const response = await apiCall('/api/collections/example_prompts/records');
+            
+            if (!response.items || !Array.isArray(response.items)) {
+                throw new Error('Prompts list response invalid');
+            }
+
+            if (response.items.length === 0) {
+                throw new Error('No example prompts found');
+            }
+
+            return response.items;
+        }
+
+        async function testDocumentCreation() {
+            if (!testProjectId) {
+                throw new Error('No test project available for document creation');
+            }
+
+            const docData = {
+                title: 'Frontend Test Document',
+                content: '# Frontend Test\n\nDieses Dokument wurde durch Frontend-Tests erstellt.',
+                project_id: testProjectId,
+                user_id: currentUserId,
+                request_id: `FE-DOC-${Date.now()}`
+            };
+
+            const response = await apiCall('/api/collections/documents/records', {
+                method: 'POST',
+                body: JSON.stringify(docData)
+            });
+
+            if (!response.id || response.title !== docData.title) {
+                throw new Error('Document creation failed');
+            }
+
+            return response;
+        }
+
+        async function testCleanup() {
+            const results = {};
+
+            // Delete test project
+            if (testProjectId) {
+                try {
+                    await apiCall(`/api/collections/projects/records/${testProjectId}`, {
+                        method: 'DELETE'
+                    });
+                    results.project = 'deleted';
+                } catch (error) {
+                    results.project = `error: ${error.message}`;
+                }
+            }
+
+            // Delete test API keys
+            try {
+                const apiKeys = await apiCall(`/api/collections/apikeys/records?filter=user_id="${currentUserId}"`);
+                for (const key of apiKeys.items) {
+                    if (key.name && key.name.includes('Frontend Test')) {
+                        await apiCall(`/api/collections/apikeys/records/${key.id}`, {
+                            method: 'DELETE'
+                        });
+                    }
+                }
+                results.apikeys = 'cleaned';
+            } catch (error) {
+                results.apikeys = `error: ${error.message}`;
+            }
+
+            return results;
+        }
+
+        // Main Test Runners
+        async function runAllTests() {
+            log('🚀 Starte vollständige Frontend-Tests');
+            testStartTime = Date.now();
+            
+            try {
+                // Authentication
+                await runTest('User Login', testUserLogin);
+                
+                // Core functionality
+                await runTest('Project Creation', testProjectCreation);
+                await runTest('API Key Saving', testApiKeySaving);
+                await runTest('Prompts List', testPromptsList);
+                await runTest('Document Creation', testDocumentCreation);
+                
+                // Cleanup
+                await runTest('Cleanup', testCleanup);
+                
+                log('🎉 Alle Tests erfolgreich abgeschlossen!');
+                
+            } catch (error) {
+                log(`💥 Test-Ausführung fehlgeschlagen: ${error.message}`);
+            }
+            
+            updateSummary();
+        }
+
+        async function runQuickTests() {
+            log('⚡ Starte Schnelltests');
+            testStartTime = Date.now();
+            
+            try {
+                await runTest('User Login', testUserLogin);
+                await runTest('Prompts List', testPromptsList);
+                
+                log('⚡ Schnelltests abgeschlossen!');
+                
+            } catch (error) {
+                log(`💥 Schnelltest fehlgeschlagen: ${error.message}`);
+            }
+            
+            updateSummary();
+        }
+    </script>
+</body>
+</html>
