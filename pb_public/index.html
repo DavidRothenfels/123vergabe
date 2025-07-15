@@ -1708,12 +1708,18 @@
           opencodeUrl = `/opencode-api/opencode/stream`;
         }
         
-        // Call OpenCode service - use correct model format from CLAUDE.md
+        // Call OpenCode service with timeout - use correct model format from CLAUDE.md
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+        
         const response = await fetch(`${opencodeUrl}?prompt=${encodeURIComponent(finalPrompt)}&model=gpt-4.1-mini&userId=${currentUser.id}&projectId=${currentProject.id}`, {
           headers: {
             'Authorization': 'Bearer ' + pb.authStore.token
-          }
+          },
+          signal: controller.signal
         });
+        
+        clearTimeout(timeout);
 
         if (!response.ok) {
           if (response.status === 429) {
@@ -1815,6 +1821,12 @@
         console.error('Generation error details:', error);
         console.error('Error response:', error.response);
         console.error('Error data:', error.data);
+        
+        // Handle timeout error specifically
+        if (error.name === 'AbortError') {
+          log('⏱️ Die Generierung wurde abgebrochen (Timeout nach 10 Minuten)');
+          showSnackbar('Die Generierung hat zu lange gedauert und wurde abgebrochen. Bitte versuchen Sie es erneut.', 'error', 10000);
+        }
         
         let errorMessage = error.message;
         if (error.response && error.response.data && error.response.data.message) {

@@ -204,8 +204,15 @@ WICHTIG:
 4. Verwende professionelle deutsche Sprache entsprechend Vergabestandards
 5. Berücksichtige aktuelle Marktgegebenheiten in deiner Analyse`
 
-        // Call OpenCode service
-        const response = await fetch(`http://localhost:3001/opencode/stream?prompt=${encodeURIComponent(userPrompt)}&model=openai/gpt-4.1-mini&userId=${userNeed.user_id}&recordId=${userNeed.id}&projectId=${userNeed.project_id}`)
+        // Call OpenCode service with timeout
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 600000) // 10 minutes timeout
+        
+        const response = await fetch(`http://localhost:3001/opencode/stream?prompt=${encodeURIComponent(userPrompt)}&model=openai/gpt-4.1-mini&userId=${userNeed.user_id}&recordId=${userNeed.id}&projectId=${userNeed.project_id}`, {
+            signal: controller.signal
+        })
+        
+        clearTimeout(timeout)
         
         if (!response.ok) {
             throw new Error(`OpenCode service error: ${response.statusText}`)
