@@ -3,22 +3,186 @@
 /**
  * CLI Command Processor für lokale Dokumentenerstellung
  * Verarbeitet cli_commands für automatische Dokumentengenerierung
+ * Mit detailliertem Logging und 24h Auto-Deletion
  */
 
 const fetch = require('node-fetch')
+const sqlite3 = require('sqlite3').verbose()
 
 const POCKETBASE_URL = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090'
 const POLL_INTERVAL = 3000 // 3 Sekunden
 
-console.log('🚀 CLI Command Processor gestartet')
+// Logging Konfiguration
+const LOG_LEVELS = {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARN: 'warn', 
+    ERROR: 'error'
+}
+
+const ERROR_TYPES = {
+    CLI_ERROR: 'cli_error',
+    POCKETBASE_ERROR: 'pocketbase_error',
+    OPENCODE_ERROR: 'opencode_error',
+    DATABASE_ERROR: 'database_error',
+    NETWORK_ERROR: 'network_error',
+    VALIDATION_ERROR: 'validation_error'
+}
+
+const SEVERITY_LEVELS = {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+    CRITICAL: 'critical'
+}
+
+console.log('🚀 CLI Command Processor gestartet (Enhanced Logging)')
 console.log('📡 PocketBase URL:', POCKETBASE_URL)
+
+/**
+ * Enhanced logging functions for CLI processor
+ */
+async function createLog(message, level = LOG_LEVELS.INFO, source = 'cli', context = {}) {
+    try {
+        const db = new sqlite3.Database('./pb_data/data.db')
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
+        
+        return new Promise((resolve, reject) => {
+            const id = 'cli' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9)
+            const now = new Date().toISOString()
+            
+            db.run(`
+                INSERT INTO logs (
+                    id, message, level, source, request_id, user_id, 
+                    error_details, stack_trace, expires_at, created, updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id, message, level, source,
+                context.request_id || null,
+                context.user_id || null,
+                context.error_details ? JSON.stringify(context.error_details) : null,
+                context.stack_trace || null,
+                expiresAt.toISOString(),
+                now, now
+            ], function(err) {
+                db.close()
+                if (err) {
+                    console.error('❌ Failed to create log:', err.message)
+                    resolve(null)
+                } else {
+                    resolve(id)
+                }
+            })
+        })
+    } catch (error) {
+        console.error('❌ Error in createLog:', error.message)
+        return null
+    }
+}
+
+async function createErrorLog(errorType, errorMessage, context = {}) {
+    try {
+        const db = new sqlite3.Database('./pb_data/data.db')
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
+        
+        return new Promise((resolve, reject) => {
+            const id = 'err' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9)
+            const now = new Date().toISOString()
+            
+            db.run(`
+                INSERT INTO error_logs (
+                    id, error_type, error_message, error_context, stack_trace,
+                    source_file, line_number, request_id, user_id, severity,
+                    resolved, expires_at, created, updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id, errorType, errorMessage,
+                context.error_context ? JSON.stringify(context.error_context) : null,
+                context.stack_trace || null,
+                context.source_file || 'process_cli_commands.js',
+                context.line_number || null,
+                context.request_id || null,
+                context.user_id || null,
+                context.severity || SEVERITY_LEVELS.MEDIUM,
+                false,
+                expiresAt.toISOString(),
+                now, now
+            ], function(err) {
+                db.close()
+                if (err) {
+                    console.error('❌ Failed to create error log:', err.message)
+                    resolve(null)
+                } else {
+                    // Also create regular log
+                    createLog(`ERROR: ${errorMessage}`, LOG_LEVELS.ERROR, 'cli', {
+                        request_id: context.request_id,
+                        user_id: context.user_id,
+                        error_details: { type: errorType, severity: context.severity }
+                    })
+                    resolve(id)
+                }
+            })
+        })
+    } catch (error) {
+        console.error('❌ Error in createErrorLog:', error.message)
+        return null
+    }
+}
+
+async function createPerformanceLog(operation, durationMs, success = true, context = {}) {
+    try {
+        const db = new sqlite3.Database('./pb_data/data.db')
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
+        
+        return new Promise((resolve, reject) => {
+            const id = 'perf' + Math.random().toString(36).substring(2, 9) + Math.random().toString(36).substring(2, 9)
+            const now = new Date().toISOString()
+            
+            db.run(`
+                INSERT INTO performance_logs (
+                    id, operation, duration_ms, source, metadata,
+                    request_id, user_id, success, expires_at, created
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id, operation, durationMs, 'cli',
+                context.metadata ? JSON.stringify(context.metadata) : null,
+                context.request_id || null,
+                context.user_id || null,
+                success,
+                expiresAt.toISOString(),
+                now
+            ], function(err) {
+                db.close()
+                if (err) {
+                    console.error('❌ Failed to create performance log:', err.message)
+                    resolve(null)
+                } else {
+                    resolve(id)
+                }
+            })
+        })
+    } catch (error) {
+        console.error('❌ Error in createPerformanceLog:', error.message)
+        return null
+    }
+}
 
 // Polling-Loop für neue CLI Commands
 setInterval(async () => {
+    const startTime = Date.now()
     try {
         await processCommands()
+        await createPerformanceLog('command_polling', Date.now() - startTime, true)
     } catch (error) {
         console.error('❌ Error processing commands:', error.message)
+        await createErrorLog(ERROR_TYPES.CLI_ERROR, `Command polling failed: ${error.message}`, {
+            severity: SEVERITY_LEVELS.HIGH,
+            stack_trace: error.stack
+        })
+        await createPerformanceLog('command_polling', Date.now() - startTime, false)
     }
 }, POLL_INTERVAL)
 
@@ -43,11 +207,20 @@ async function processCommands() {
         
     } catch (error) {
         console.error('❌ Error in processCommands:', error.message)
+        await createErrorLog(ERROR_TYPES.CLI_ERROR, `Error in processCommands: ${error.message}`, {
+            severity: SEVERITY_LEVELS.MEDIUM,
+            stack_trace: error.stack
+        })
     }
 }
 
 async function processDocumentGeneration(command) {
+    const startTime = Date.now()
     try {
+        await createLog(`Starting document generation for command ${command.id}`, LOG_LEVELS.INFO, 'cli', {
+            request_id: command.id
+        })
+        
         // Mark as processing
         await updateCommandStatus(command.id, 'processing')
         
@@ -105,10 +278,34 @@ async function processDocumentGeneration(command) {
         // Mark command as completed
         await updateCommandStatus(command.id, 'completed', `Generated ${generatedDocs.length} documents`)
         
+        const duration = Date.now() - startTime
+        await createLog(`Document generation completed for request ${requestId}`, LOG_LEVELS.INFO, 'cli', {
+            request_id: requestId,
+            user_id: userNeed.user_id
+        })
+        await createPerformanceLog('document_generation', duration, true, {
+            request_id: requestId,
+            user_id: userNeed.user_id,
+            metadata: { docs_generated: generatedDocs.length }
+        })
         console.log(`🎉 Document generation completed for request ${requestId}`)
         
     } catch (error) {
+        const duration = Date.now() - startTime
         console.error('❌ Error in document generation:', error.message)
+        
+        await createErrorLog(ERROR_TYPES.CLI_ERROR, `Document generation failed: ${error.message}`, {
+            severity: SEVERITY_LEVELS.HIGH,
+            stack_trace: error.stack,
+            request_id: command.id,
+            error_context: { command_parameters: command.parameters }
+        })
+        
+        await createPerformanceLog('document_generation', duration, false, {
+            request_id: command.id,
+            metadata: { error: error.message }
+        })
+        
         await updateCommandStatus(command.id, 'failed', error.message)
         
         // Also mark generation request as failed
@@ -134,18 +331,30 @@ async function getUserNeed(userNeedId) {
                 db.close()
                 if (err) {
                     console.error('❌ Database error fetching user need:', err.message)
+                    createErrorLog(ERROR_TYPES.DATABASE_ERROR, `Failed to fetch user need ${userNeedId}: ${err.message}`, {
+                        severity: SEVERITY_LEVELS.MEDIUM,
+                        user_id: userNeedId
+                    })
                     resolve(null)
                 } else if (row) {
                     console.log(`✅ Found user need: ${row.thema}`)
+                    createLog(`Successfully fetched user need: ${row.thema}`, LOG_LEVELS.DEBUG, 'cli', {
+                        user_id: row.user_id
+                    })
                     resolve(row)
                 } else {
                     console.log(`⚠️ User need not found: ${userNeedId}`)
+                    createLog(`User need not found: ${userNeedId}`, LOG_LEVELS.WARN, 'cli')
                     resolve(null)
                 }
             })
         })
     } catch (error) {
         console.error('❌ Error fetching user need:', error.message)
+        await createErrorLog(ERROR_TYPES.DATABASE_ERROR, `Error fetching user need: ${error.message}`, {
+            severity: SEVERITY_LEVELS.MEDIUM,
+            stack_trace: error.stack
+        })
         return null
     }
 }
