@@ -39,7 +39,25 @@ function getAIProvider(providerName) {
 // Route: Generate questions based on initial description
 routerAdd("POST", "/api/generate-questions", (e) => {
     try {
-        const data = e.requestInfo.data
+        // Parse JSON body
+        let data = {}
+        try {
+            // In PocketBase hooks, request data is accessed directly
+            const rawData = e.request.data()
+            if (rawData && typeof rawData === 'object') {
+                data = rawData
+            } else {
+                // Try to parse as JSON string
+                const bodyStr = e.request.bodyRaw()
+                if (bodyStr) {
+                    data = JSON.parse(bodyStr)
+                }
+            }
+        } catch (err) {
+            console.log("Body parsing error:", err)
+            throw new Error("Invalid JSON body: " + err.message)
+        }
+        
         const userId = e.auth?.id
         
         if (!userId) {
@@ -167,7 +185,25 @@ Format als JSON:
 // Route: Generate additional questions based on existing answers
 routerAdd("POST", "/api/generate-additional-questions", (e) => {
     try {
-        const data = e.requestInfo.data
+        // Parse JSON body
+        let data = {}
+        try {
+            // In PocketBase hooks, request data is accessed directly
+            const rawData = e.request.data()
+            if (rawData && typeof rawData === 'object') {
+                data = rawData
+            } else {
+                // Try to parse as JSON string
+                const bodyStr = e.request.bodyRaw()
+                if (bodyStr) {
+                    data = JSON.parse(bodyStr)
+                }
+            }
+        } catch (err) {
+            console.log("Body parsing error:", err)
+            throw new Error("Invalid JSON body: " + err.message)
+        }
+        
         const userId = e.auth?.id
         
         if (!userId) {
@@ -259,7 +295,25 @@ Format als JSON wie vorher.`
 // Route: Submit answers and generate document
 routerAdd("POST", "/api/submit-answers", (e) => {
     try {
-        const data = e.requestInfo.data
+        // Parse JSON body
+        let data = {}
+        try {
+            // In PocketBase hooks, request data is accessed directly
+            const rawData = e.request.data()
+            if (rawData && typeof rawData === 'object') {
+                data = rawData
+            } else {
+                // Try to parse as JSON string
+                const bodyStr = e.request.bodyRaw()
+                if (bodyStr) {
+                    data = JSON.parse(bodyStr)
+                }
+            }
+        } catch (err) {
+            console.log("Body parsing error:", err)
+            throw new Error("Invalid JSON body: " + err.message)
+        }
+        
         const userId = e.auth?.id
         
         if (!userId) {
@@ -424,7 +478,25 @@ Generiere das Ergebnis als JSON mit folgendem Format:
 // Route: Generate comprehensive description from Q&A
 routerAdd("POST", "/api/generate-description", (e) => {
     try {
-        const data = e.requestInfo.data
+        // Parse JSON body
+        let data = {}
+        try {
+            // In PocketBase hooks, request data is accessed directly
+            const rawData = e.request.data()
+            if (rawData && typeof rawData === 'object') {
+                data = rawData
+            } else {
+                // Try to parse as JSON string
+                const bodyStr = e.request.bodyRaw()
+                if (bodyStr) {
+                    data = JSON.parse(bodyStr)
+                }
+            }
+        } catch (err) {
+            console.log("Body parsing error:", err)
+            throw new Error("Invalid JSON body: " + err.message)
+        }
+        
         const userId = e.auth?.id
         
         if (!userId) {
@@ -500,7 +572,25 @@ WICHTIG:
 // Route: Generate document from template
 routerAdd("POST", "/api/generate-from-template", (e) => {
     try {
-        const data = e.requestInfo.data
+        // Parse JSON body
+        let data = {}
+        try {
+            // In PocketBase hooks, request data is accessed directly
+            const rawData = e.request.data()
+            if (rawData && typeof rawData === 'object') {
+                data = rawData
+            } else {
+                // Try to parse as JSON string
+                const bodyStr = e.request.bodyRaw()
+                if (bodyStr) {
+                    data = JSON.parse(bodyStr)
+                }
+            }
+        } catch (err) {
+            console.log("Body parsing error:", err)
+            throw new Error("Invalid JSON body: " + err.message)
+        }
+        
         const userId = e.auth?.id
         
         if (!userId) {
