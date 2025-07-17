@@ -1,62 +1,34 @@
-# Simplified Dockerfile that copies all PocketBase data and files
-FROM node:20-alpine
+# Simplified Dockerfile for PocketBase only
+FROM alpine:3.19
 
-# Install system dependencies
+# Install minimal dependencies
 RUN apk add --no-cache \
-    bash \
-    curl \
-    git \
-    sqlite \
-    jq \
+    ca-certificates \
+    wget \
     && rm -rf /var/cache/apk/*
-
-# Install PM2 for process management and OpenCode for headless operation
-RUN npm install -g pm2 opencode-ai@latest
 
 # Create app directory
 WORKDIR /app
 
-# Copy package files for dependencies
-COPY package*.json ./
-
-# Install Node.js dependencies
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Copy the pre-built PocketBase binary directly
+# Copy the pre-built PocketBase binary
 COPY pocketbase ./pocketbase
 RUN chmod +x ./pocketbase
 
-# Copy all PocketBase data (databases, storage, etc.)
+# Copy all PocketBase directories
 COPY pb_data/ ./pb_data/
-COPY pb_hooks/ ./pb_hooks/
 COPY pb_public/ ./pb_public/
+COPY pb_hooks/ ./pb_hooks/
 COPY pb_migrations/ ./pb_migrations/
 
-# Copy application files
-COPY *.js ./
-COPY *.sh ./
-COPY *.json ./
-RUN chmod +x ./*.sh
+# Expose PocketBase port
+EXPOSE 8090
 
-# Set environment for headless operation
-ENV DISPLAY=
-ENV NO_GUI=1
-
-# Create necessary directories
-RUN mkdir -p pb_data pb_logs temp
-
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3001
-ENV POCKETBASE_URL=http://localhost:8090
-ENV PATH="/usr/local/bin:${PATH}"
-
-# Expose ports
-EXPOSE 8090 3001
+# Set environment variable for OpenRouter API
+ENV OPENROUTER_API_KEY=""
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8090/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8090/api/health || exit 1
 
-# Start the application
-CMD ["./start-production.sh"]
+# Start PocketBase
+CMD ["./pocketbase", "serve", "--http=0.0.0.0:8090"]
