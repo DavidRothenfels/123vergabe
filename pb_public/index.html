@@ -953,9 +953,16 @@
                 <textarea id="themaInput" placeholder="Beschreiben Sie Ihr Projekt..."></textarea>
               </div>
 
-              <button onclick="generateDocument()" id="generateBtn" title="Dokument generieren" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; width: 100%;">
-                <i data-feather="zap" style="color: #f97316;"></i>
-              </button>
+              <div style="display: flex; gap: 0.5rem;">
+                <button onclick="openBedarfModal()" class="btn btn-primary" style="flex: 1;">
+                  <i data-feather="target"></i>
+                  Bedarfsanalyse
+                </button>
+                <button onclick="generateDocument()" id="generateBtn" title="Dokument generieren" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s;">
+                  <i data-feather="zap" style="color: #f97316;"></i>
+                  Direkt generieren
+                </button>
+              </div>
 
               <!-- Process Controls (hidden by default) -->
               <div id="processControls" style="display: none; margin-top: 0.75rem; padding: 0.75rem; background: #f8f9fa; border-radius: 0.5rem; border: 1px solid #e9ecef;">
@@ -1142,6 +1149,248 @@
         .replace(/\\sqrt/g, '√')
         .replace(/\\\\/g, '')
         .trim();
+    }
+
+    // Bedarf Analysis Functions
+    let currentBedarfId = null;
+    let currentQuestions = [];
+    let currentAnswers = {};
+
+    function openBedarfModal() {
+      document.getElementById('bedarfModal').classList.add('show');
+      resetBedarfModal();
+      feather.replace();
+    }
+
+    function closeBedarfModal() {
+      document.getElementById('bedarfModal').classList.remove('show');
+      resetBedarfModal();
+    }
+
+    function resetBedarfModal() {
+      // Reset to phase 1
+      showBedarfPhase(1);
+      document.getElementById('bedarfDescription').value = '';
+      currentBedarfId = null;
+      currentQuestions = [];
+      currentAnswers = {};
+    }
+
+    function showBedarfPhase(phase) {
+      // Update progress indicators
+      for (let i = 1; i <= 4; i++) {
+        const step = document.getElementById(`phase${i}`);
+        const content = document.getElementById(`bedarfPhase${i}`);
+        
+        if (i <= phase) {
+          step.classList.add('active');
+        } else {
+          step.classList.remove('active');
+        }
+        
+        if (i === phase) {
+          content.classList.remove('hidden');
+        } else {
+          content.classList.add('hidden');
+        }
+      }
+    }
+
+    async function generateBedarfQuestions() {
+      const description = document.getElementById('bedarfDescription').value.trim();
+      
+      if (!description) {
+        showSnackbar('Bitte beschreiben Sie Ihr Vorhaben', 'warning');
+        return;
+      }
+
+      try {
+        showSnackbar('Fragen werden generiert...', 'processing');
+        
+        // Create bedarf record
+        const bedarfData = {
+          user_id: currentUser.id,
+          project_id: currentProject?.id || '',
+          initial_description: description,
+          status: 'draft',
+          ai_provider: 'openrouter'
+        };
+        
+        const bedarf = await pb.collection('bedarf').create(bedarfData);
+        currentBedarfId = bedarf.id;
+        
+        // Generate questions
+        const response = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token
+          },
+          body: JSON.stringify({
+            description: description,
+            bedarf_id: currentBedarfId,
+            ai_provider: 'openrouter'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Fehler beim Generieren der Fragen');
+        }
+
+        const result = await response.json();
+        currentQuestions = result.questions || [];
+        
+        renderQuestions();
+        showBedarfPhase(2);
+        closeSnackbar();
+        
+      } catch (error) {
+        console.error('Error generating questions:', error);
+        showSnackbar('Fehler: ' + error.message, 'error');
+      }
+    }
+
+    function renderQuestions() {
+      const container = document.getElementById('questionsContainer');
+      container.innerHTML = '';
+      
+      currentQuestions.forEach((question, index) => {
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question-card';
+        questionDiv.innerHTML = `
+          <span class="question-priority ${question.priority}">${question.priority === 'high' ? 'Hoch' : question.priority === 'medium' ? 'Mittel' : 'Niedrig'}</span>
+          <h4>${question.text}</h4>
+          <div class="question-options">
+            ${question.options.map((opt, i) => `
+              <label>
+                <input type="checkbox" name="q${question.id}" value="${opt}" onchange="updateAnswer('${question.id}', '${opt}', this.checked)">
+                ${opt}
+              </label>
+            `).join('')}
+          </div>
+          ${question.allow_other ? `
+            <textarea 
+              rows="2" 
+              placeholder="Weitere Details..." 
+              onchange="updateAnswerText('${question.id}', this.value)"
+              style="width: 100%; margin-top: 0.5rem;"
+            ></textarea>
+          ` : ''}
+        `;
+        container.appendChild(questionDiv);
+      });
+    }
+
+    function updateAnswer(questionId, option, checked) {
+      if (!currentAnswers[questionId]) {
+        currentAnswers[questionId] = {
+          selected_options: [],
+          other_text: ''
+        };
+      }
+      
+      if (checked) {
+        if (!currentAnswers[questionId].selected_options.includes(option)) {
+          currentAnswers[questionId].selected_options.push(option);
+        }
+      } else {
+        currentAnswers[questionId].selected_options = currentAnswers[questionId].selected_options.filter(o => o !== option);
+      }
+    }
+
+    function updateAnswerText(questionId, text) {
+      if (!currentAnswers[questionId]) {
+        currentAnswers[questionId] = {
+          selected_options: [],
+          other_text: ''
+        };
+      }
+      currentAnswers[questionId].other_text = text;
+    }
+
+    async function requestMoreQuestions() {
+      try {
+        showSnackbar('Weitere Fragen werden generiert...', 'processing');
+        
+        const response = await fetch('/api/generate-additional-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token
+          },
+          body: JSON.stringify({
+            bedarf_id: currentBedarfId,
+            answers: currentAnswers,
+            ai_provider: 'openrouter'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Fehler beim Generieren weiterer Fragen');
+        }
+
+        const result = await response.json();
+        const newQuestions = result.questions || [];
+        
+        // Add new questions to existing ones
+        currentQuestions = [...currentQuestions, ...newQuestions];
+        renderQuestions();
+        
+        closeSnackbar();
+        showSnackbar('Weitere Fragen hinzugefügt', 'success');
+        
+      } catch (error) {
+        console.error('Error generating additional questions:', error);
+        showSnackbar('Fehler: ' + error.message, 'error');
+      }
+    }
+
+    async function submitBedarfAnswers() {
+      try {
+        showBedarfPhase(3);
+        
+        const response = await fetch('/api/submit-answers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token
+          },
+          body: JSON.stringify({
+            bedarf_id: currentBedarfId,
+            answers: currentAnswers,
+            ai_provider: 'openrouter'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Fehler beim Generieren des Dokuments');
+        }
+
+        const result = await response.json();
+        
+        // Display generated document
+        document.getElementById('bedarfDocumentContent').innerHTML = result.rendered_content;
+        showBedarfPhase(4);
+        
+        // Reload documents list
+        await loadDocuments();
+        
+      } catch (error) {
+        console.error('Error submitting answers:', error);
+        showSnackbar('Fehler: ' + error.message, 'error');
+        showBedarfPhase(2);
+      }
+    }
+
+    async function copyBedarfDocument() {
+      try {
+        const content = document.getElementById('bedarfDocumentContent').innerText;
+        await navigator.clipboard.writeText(content);
+        showSnackbar('Dokument kopiert', 'success');
+      } catch (error) {
+        console.error('Error copying document:', error);
+        showSnackbar('Fehler beim Kopieren', 'error');
+      }
     }
 
     // Initialize app
@@ -1717,56 +1966,25 @@
         console.log('🔍 Debug: Original prompt:', selectedPrompt.prompt_text);
         console.log('🔍 Debug: Final prompt:', finalPrompt);
         
-        // Determine OpenCode API URL based on environment
-        let opencodeUrl;
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          // Local development
-          opencodeUrl = `http://${window.location.hostname}:3001/opencode/stream`;
-        } else {
-          // Production - use path prefix for Coolify/Traefik routing
-          opencodeUrl = `/opencode-api/opencode/stream`;
-        }
-        
-        // Call OpenCode service with timeout - use correct model format from CLAUDE.md
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
-        
-        const response = await fetch(`${opencodeUrl}?prompt=${encodeURIComponent(finalPrompt)}&model=gpt-4.1-mini&userId=${currentUser.id}&projectId=${currentProject.id}`, {
+        // Call PocketBase API for direct generation
+        const response = await fetch('/api/generate-direct', {
+          method: 'POST',
           headers: {
-            'Authorization': 'Bearer ' + pb.authStore.token
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token
           },
-          signal: controller.signal
+          body: JSON.stringify({
+            prompt: finalPrompt,
+            project_id: currentProject?.id || ''
+          })
         });
-        
-        clearTimeout(timeout);
 
         if (!response.ok) {
-          if (response.status === 429) {
-            // Process already running - show status and cancel option
-            const errorData = await response.json();
-            handleProcessAlreadyRunning(errorData);
-            return;
-          }
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
-        // Stream the response
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value);
-          fullContent += chunk;
-          
-          // Log chunks in real-time
-          if (chunk.trim()) {
-            log(`📤 ${chunk.trim()}`);
-          }
-        }
+        const result = await response.json();
+        let fullContent = result.content || '';
 
         // Save the generated document
         // Dokumentenart aus selectedPrompt extrahieren
@@ -2378,47 +2596,16 @@
       
       if (show) {
         controls.style.display = 'block';
-        startStatusCheck();
+        controls.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-weight: 500;">Dokument wird generiert...</span>
+          </div>
+          <div style="font-size: 0.875rem; color: #6b7280;">
+            Dies kann einige Minuten dauern...
+          </div>
+        `;
       } else {
         controls.style.display = 'none';
-        stopStatusCheck();
-      }
-    }
-    
-    function startStatusCheck() {
-      if (statusCheckInterval) return;
-      
-      statusCheckInterval = setInterval(async () => {
-        try {
-          // Determine OpenCode API URL
-          const opencodeUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-            ? `http://${window.location.hostname}:3001/opencode/status`
-            : `/opencode-api/opencode/status`;
-          
-          const response = await fetch(`${opencodeUrl}?userId=${currentUser.id}`);
-          if (!response.ok) {
-            // Skip status check if service not available
-            return;
-          }
-          const status = await response.json();
-          
-          updateProcessStatus(status);
-          
-          if (!status.running) {
-            // Process finished
-            stopStatusCheck();
-            showProcessControls(false);
-          }
-        } catch (error) {
-          console.error('Status check failed:', error);
-        }
-      }, 2000); // Check every 2 seconds
-    }
-    
-    function stopStatusCheck() {
-      if (statusCheckInterval) {
-        clearInterval(statusCheckInterval);
-        statusCheckInterval = null;
       }
     }
     
@@ -2491,6 +2678,201 @@
       </div>
     </div>
   </div>
+
+  <!-- Bedarf Analysis Popup -->
+  <div id="bedarfModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2>
+          <i data-feather="target"></i>
+          Bedarfsanalyse
+        </h2>
+        <button class="modal-close" onclick="closeBedarfModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Phase Progress -->
+        <div class="phase-progress" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+          <div class="phase-step active" id="phase1">
+            <div class="phase-number">1</div>
+            <div class="phase-label">Beschreibung</div>
+          </div>
+          <div class="phase-step" id="phase2">
+            <div class="phase-number">2</div>
+            <div class="phase-label">Fragen</div>
+          </div>
+          <div class="phase-step" id="phase3">
+            <div class="phase-number">3</div>
+            <div class="phase-label">Generierung</div>
+          </div>
+          <div class="phase-step" id="phase4">
+            <div class="phase-number">4</div>
+            <div class="phase-label">Dokument</div>
+          </div>
+        </div>
+
+        <!-- Phase 1: Input -->
+        <div id="bedarfPhase1" class="phase-content">
+          <div class="form-group">
+            <label for="bedarfDescription">Beschreiben Sie Ihr Beschaffungsvorhaben:</label>
+            <textarea id="bedarfDescription" rows="6" placeholder="Beschreiben Sie möglichst detailliert, was Sie beschaffen möchten..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" onclick="generateBedarfQuestions()">
+              <i data-feather="message-square"></i>
+              Fragen generieren
+            </button>
+          </div>
+        </div>
+
+        <!-- Phase 2: Questions -->
+        <div id="bedarfPhase2" class="phase-content hidden">
+          <div id="questionsContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <!-- Questions will be populated here -->
+          </div>
+          <div class="modal-footer" style="justify-content: space-between;">
+            <button class="btn btn-secondary" onclick="requestMoreQuestions()">
+              <i data-feather="plus-circle"></i>
+              Weitere Fragen
+            </button>
+            <button class="btn btn-primary" onclick="submitBedarfAnswers()">
+              <i data-feather="file-text"></i>
+              Dokument generieren
+            </button>
+          </div>
+        </div>
+
+        <!-- Phase 3: Generation -->
+        <div id="bedarfPhase3" class="phase-content hidden">
+          <div style="text-align: center; padding: 3rem;">
+            <div class="spinner" style="margin: 0 auto 2rem;"></div>
+            <h3>Dokument wird generiert...</h3>
+            <p style="color: #6b7280;">Dies kann einige Minuten dauern.</p>
+          </div>
+        </div>
+
+        <!-- Phase 4: Result -->
+        <div id="bedarfPhase4" class="phase-content hidden">
+          <div class="document-preview" style="border: 1px solid #e1e5e9; border-radius: 0.5rem; padding: 2rem; max-height: 60vh; overflow-y: auto;">
+            <div id="bedarfDocumentContent">
+              <!-- Generated document will be shown here -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="copyBedarfDocument()">
+              <i data-feather="copy"></i>
+              Kopieren
+            </button>
+            <button class="btn btn-primary" onclick="closeBedarfModal()">
+              <i data-feather="check"></i>
+              Fertig
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Bedarf Modal Styles */
+    .phase-progress {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .phase-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0.4;
+      transition: opacity 0.3s;
+    }
+    
+    .phase-step.active {
+      opacity: 1;
+    }
+    
+    .phase-number {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #e1e5e9;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .phase-step.active .phase-number {
+      background: var(--primary);
+      color: white;
+    }
+    
+    .phase-label {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+    
+    .question-card {
+      background: #f9fafb;
+      border: 1px solid #e1e5e9;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+    }
+    
+    .question-priority {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    
+    .question-priority.high {
+      background: rgba(220, 53, 69, 0.1);
+      color: var(--error);
+    }
+    
+    .question-priority.medium {
+      background: rgba(255, 193, 7, 0.1);
+      color: var(--warning);
+    }
+    
+    .question-priority.low {
+      background: rgba(40, 167, 69, 0.1);
+      color: var(--success);
+    }
+    
+    .question-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    
+    .question-options label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e1e5e9;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 
 </body>
 </html>

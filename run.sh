@@ -1,28 +1,12 @@
 #!/bin/bash
 
-# Development Start Script für OpenCode Multiuser System
-# Optimiert für Docker/Coolify-kompatibles lokales Development
+# Development Start Script für 123vergabe
+# PocketBase mit integrierten Hooks
 
 set -e
 
-echo "🚀 Starting OpenCode Multiuser System - Development Mode"
-echo "============================================="
-
-# Environment Check
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "❌ OPENAI_API_KEY environment variable not set"
-    echo "💡 Please set your OpenAI API key:"
-    echo "   export OPENAI_API_KEY='your-api-key'"
-    exit 1
-fi
-
-echo "✅ OPENAI_API_KEY configured: ${OPENAI_API_KEY:0:8}..."
-
-# Check OpenCode Installation
-if ! command -v opencode &> /dev/null; then
-    echo "⚠️  OpenCode not found. Installing globally..."
-    npm install -g opencode-ai@latest
-fi
+echo "🚀 Starting 123vergabe - Development Mode"
+echo "========================================="
 
 # Check PocketBase Binary
 if [ ! -f "./pocketbase" ]; then
@@ -37,16 +21,15 @@ mkdir -p pb_data pb_logs temp
 # Cleanup function
 cleanup() {
     echo ""
-    echo "🛑 Shutting down services..."
+    echo "🛑 Shutting down PocketBase..."
     
-    # Stop all processes
-    pkill -f "node opencode-service.js" 2>/dev/null || true
+    # Stop PocketBase
     pkill -f "pocketbase serve" 2>/dev/null || true
     
-    # Wait for processes to stop
+    # Wait for process to stop
     sleep 2
     
-    echo "✅ Services stopped"
+    echo "✅ PocketBase stopped"
     exit 0
 }
 
@@ -83,61 +66,23 @@ if [ $timeout -le 0 ]; then
     exit 1
 fi
 
-# Start OpenCode Service
-echo ""
-echo "🔧 Starting OpenCode Service..."
-
-# Set development environment
-export NODE_ENV=development
-export PORT=3001
-export POCKETBASE_URL=http://localhost:8090
-
-# Kill any existing opencode-service processes
-pkill -f "node opencode-service.js" 2>/dev/null || true
-sleep 1
-
-# Start the service
-node opencode-service.js &
-NODEJS_PID=$!
-
-echo "📍 OpenCode Service PID: $NODEJS_PID"
-
-# Wait for OpenCode Service
-echo "⏳ Waiting for OpenCode Service to start..."
-timeout=20
-while [ $timeout -gt 0 ]; do
-    if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
-        echo "✅ OpenCode Service is ready!"
-        break
-    fi
-    sleep 1
-    timeout=$((timeout-1))
-done
-
-if [ $timeout -le 0 ]; then
-    echo "❌ OpenCode Service failed to start"
-    exit 1
-fi
 
 echo ""
 echo "🎉 All services started successfully!"
 echo "============================================="
 echo ""
 echo "🌐 Development URLs:"
-echo "   • Dashboard: http://localhost:8090/debug.html"
+echo "   • Dashboard: http://localhost:8090/"
 echo "   • PocketBase Admin: http://localhost:8090/_/"
-echo "   • OpenCode API: http://localhost:3001"
 echo ""
-echo "📊 Process IDs:"
+echo "📊 Process ID:"
 echo "   • PocketBase: $POCKETBASE_PID"
-echo "   • OpenCode Service: $NODEJS_PID"
 echo ""
 echo "💡 Development Tips:"
 echo "   • PocketBase hooks in pb_hooks/ (restart required)"
 echo "   • Frontend files in pb_public/"
-echo "   • OpenCode service in opencode-service.js"
 echo "   • Database in pb_data/data.db"
-echo "   • Press Ctrl+C to stop all services"
+echo "   • Press Ctrl+C to stop PocketBase"
 echo ""
 echo "🔄 Development system running... Press Ctrl+C to stop"
 
@@ -151,8 +96,4 @@ while true; do
         exit 1
     fi
     
-    if ! kill -0 $NODEJS_PID 2>/dev/null; then
-        echo "❌ OpenCode Service died!"
-        exit 1
-    fi
 done
