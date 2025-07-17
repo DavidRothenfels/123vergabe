@@ -935,32 +935,21 @@
             </div>
 
             <div class="input-section">
-              <div class="form-group">
-                <label for="promptSelect">Dokumentenart</label>
-                <div style="display: flex; gap: 0.5rem;">
-                  <select id="promptSelect" style="flex: 1;">
-                    <option value="">Dokumentenart wählen...</option>
-                  </select>
-                  <button type="button" id="exampleBtn" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
-                    <i data-feather="book-open" style="width: 1rem; height: 1rem; color: black;"></i>
-                    Beispiele
-                  </button>
-                </div>
-              </div>
 
               <div class="form-group">
                 <label for="themaInput">Beschreibung</label>
                 <textarea id="themaInput" placeholder="Beschreiben Sie Ihr Projekt..."></textarea>
               </div>
 
-              <div style="display: flex; gap: 0.5rem;">
-                <button onclick="openBedarfModal()" class="btn btn-primary" style="flex: 1;">
-                  <i data-feather="target"></i>
-                  Bedarfsanalyse
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="openBedarfModal()" class="btn btn-secondary" title="Beschreibung durch Fragen präzisieren" style="white-space: nowrap;">
+                  <i data-feather="message-square"></i>
+                  Mit Fragen präzisieren
                 </button>
-                <button onclick="generateDocument()" id="generateBtn" title="Dokument generieren" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border: 1px solid #6b7280; border-radius: 0.5rem; background: white; color: black; font-weight: 500; cursor: pointer; transition: all 0.2s;">
-                  <i data-feather="zap" style="color: #f97316;"></i>
-                  Direkt generieren
+                <div style="flex: 1; text-align: center; color: #6b7280; font-size: 0.875rem;">oder</div>
+                <button onclick="generateFromTemplate()" id="generateBtn" class="btn btn-primary" title="Dokument aus Beschreibung generieren" style="white-space: nowrap;">
+                  <i data-feather="file-text"></i>
+                  Dokument generieren
                 </button>
               </div>
 
@@ -1349,7 +1338,8 @@
       try {
         showBedarfPhase(3);
         
-        const response = await fetch('/api/submit-answers', {
+        // Generate a comprehensive description from questions and answers
+        const response = await fetch('/api/generate-description', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1357,23 +1347,43 @@
           },
           body: JSON.stringify({
             bedarf_id: currentBedarfId,
+            initial_description: document.getElementById('bedarfDescription').value,
+            questions: currentQuestions,
             answers: currentAnswers,
             ai_provider: 'openrouter'
           })
         });
 
         if (!response.ok) {
-          throw new Error('Fehler beim Generieren des Dokuments');
+          throw new Error('Fehler beim Generieren der Beschreibung');
         }
 
         const result = await response.json();
         
-        // Display generated document
-        document.getElementById('bedarfDocumentContent').innerHTML = result.rendered_content;
+        // Update the main description field with the comprehensive description
+        document.getElementById('themaInput').value = result.description;
+        
+        // Show success message in phase 4
+        document.getElementById('bedarfDocumentContent').innerHTML = `
+          <div style="text-align: center; padding: 2rem;">
+            <div style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;">✓</div>
+            <h3 style="margin-bottom: 1rem;">Beschreibung wurde präzisiert!</h3>
+            <p style="color: #6b7280;">Die detaillierte Beschreibung wurde in das Hauptfeld übertragen.</p>
+            <p style="color: #6b7280;">Sie können jetzt auf "Dokument generieren" klicken.</p>
+          </div>
+        `;
         showBedarfPhase(4);
         
-        // Reload documents list
-        await loadDocuments();
+        // Close modal after 3 seconds
+        setTimeout(() => {
+          closeBedarfModal();
+          // Highlight the generate button
+          const btn = document.getElementById('generateBtn');
+          btn.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.5)';
+          setTimeout(() => {
+            btn.style.boxShadow = '';
+          }, 2000);
+        }, 3000);
         
       } catch (error) {
         console.error('Error submitting answers:', error);
@@ -1920,7 +1930,72 @@
       }
     }
 
-    // Document generation
+    // Template-based document generation
+    async function generateFromTemplate() {
+      const thema = document.getElementById('themaInput').value.trim();
+      
+      if (!thema) {
+        showSnackbar('Bitte geben Sie eine Beschreibung ein', 'warning');
+        return;
+      }
+
+      // Disable generate button and show processing
+      document.getElementById('generateBtn').disabled = true;
+      showSnackbar('Dokument wird generiert...', 'processing');
+      showProcessControls(true);
+      
+      try {
+        // Call template generation endpoint
+        const response = await fetch('/api/generate-from-template', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': pb.authStore.token
+          },
+          body: JSON.stringify({
+            description: thema,
+            project_id: currentProject?.id || '',
+            template_category: 'bedarf'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        // Save the document
+        const docData = {
+          title: `${currentProject?.name || 'Projekt'} - Leistungsbeschreibung`,
+          content: result.rendered_content,
+          document_type: 'leistungsbeschreibung',
+          type: 'leistungsbeschreibung',
+          generated_by_ai: true,
+          project_id: currentProject?.id || '',
+          user_id: currentUser.id,
+          created_by: currentUser.id
+        };
+        
+        const newDoc = await pb.collection('documents').create(docData);
+        
+        log('✅ Dokument erfolgreich generiert');
+        showSnackbar('Dokument erfolgreich generiert!', 'success');
+        
+        // Reload documents
+        await loadDocuments();
+        
+      } catch (error) {
+        console.error('Generation error:', error);
+        log(`❌ Fehler bei der Generierung: ${error.message}`);
+        showSnackbar('Fehler: ' + error.message, 'error');
+      } finally {
+        document.getElementById('generateBtn').disabled = false;
+        showProcessControls(false);
+      }
+    }
+
+    // Legacy document generation (will be removed)
     async function generateDocument() {
       const promptId = document.getElementById('promptSelect').value;
       const thema = document.getElementById('themaInput').value.trim();
@@ -2758,13 +2833,9 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="copyBedarfDocument()">
-              <i data-feather="copy"></i>
-              Kopieren
-            </button>
             <button class="btn btn-primary" onclick="closeBedarfModal()">
               <i data-feather="check"></i>
-              Fertig
+              Schließen
             </button>
           </div>
         </div>

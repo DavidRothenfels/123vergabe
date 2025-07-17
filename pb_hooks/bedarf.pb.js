@@ -421,4 +421,182 @@ Generiere das Ergebnis als JSON mit folgendem Format:
     }
 }, $apis.requireAuth())
 
+// Route: Generate comprehensive description from Q&A
+routerAdd("POST", "/api/generate-description", (e) => {
+    try {
+        const data = e.requestInfo.data
+        const userId = e.auth?.id
+        
+        if (!userId) {
+            throw new Error("Nicht authentifiziert")
+        }
+
+        const { initial_description, questions, answers } = data
+        
+        // Build comprehensive context
+        let context = `Ursprüngliche Beschreibung: ${initial_description}\n\n`
+        context += "Fragen und Antworten:\n"
+        
+        for (const question of questions) {
+            const answer = answers[question.id]
+            if (answer) {
+                context += `\nFrage: ${question.text}\n`
+                if (answer.selected_options?.length > 0) {
+                    context += `Antworten: ${answer.selected_options.join(", ")}\n`
+                }
+                if (answer.other_text) {
+                    context += `Details: ${answer.other_text}\n`
+                }
+            }
+        }
+
+        const provider = getAIProvider("openrouter")
+        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+        
+        const prompt = `Erstelle eine präzise und umfassende Projektbeschreibung basierend auf den folgenden Informationen:
+
+${context}
+
+WICHTIG:
+- Fasse alle Informationen in eine kohärente, detaillierte Beschreibung zusammen
+- Strukturiere die Beschreibung klar und logisch
+- Verwende professionelle Sprache
+- Die Beschreibung soll alle wichtigen Aspekte abdecken
+- Schreibe in einem Fließtext, keine Stichpunkte`
+
+        const requestBody = {
+            model: provider.model,
+            messages: [
+                { role: "system", content: "Du bist ein Experte für Projektbeschreibungen." },
+                { role: "user", content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 2000
+        }
+
+        const response = $http.send({
+            url: provider.url,
+            method: "POST",
+            headers: provider.headers(apiKey),
+            body: JSON.stringify(requestBody),
+            timeout: 120
+        })
+
+        if (response.statusCode !== 200) {
+            throw new Error(`AI API error: ${response.statusCode}`)
+        }
+
+        const result = JSON.parse(response.raw)
+        const description = result.choices[0].message.content
+
+        return e.json(200, { description })
+        
+    } catch (error) {
+        console.error("Error generating description:", error)
+        return e.json(500, { error: error.message })
+    }
+}, $apis.requireAuth())
+
+// Route: Generate document from template
+routerAdd("POST", "/api/generate-from-template", (e) => {
+    try {
+        const data = e.requestInfo.data
+        const userId = e.auth?.id
+        
+        if (!userId) {
+            throw new Error("Nicht authentifiziert")
+        }
+
+        const { description, project_id, template_category } = data
+        
+        if (!description) {
+            throw new Error("Beschreibung fehlt")
+        }
+
+        // Get template
+        const templates = $app.dao().findRecordsByFilter("templates", 
+            `category = '${template_category}' && active = true`, "", 1)
+        
+        if (templates.length === 0) {
+            throw new Error("Keine aktive Vorlage gefunden")
+        }
+        
+        const template = templates[0]
+        const placeholders = JSON.parse(template.get("placeholders") || "[]")
+        
+        // Generate content for each placeholder
+        const provider = getAIProvider("openrouter")
+        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+        
+        const prompt = `Basierend auf der folgenden Projektbeschreibung, erstelle detaillierte Inhalte für eine professionelle Leistungsbeschreibung:
+
+${description}
+
+Generiere strukturierte Inhalte für folgende Kapitel:
+${placeholders.map(p => `- ${p}`).join('\n')}
+
+WICHTIG:
+- Führe eine umfassende Recherche durch
+- Berücksichtige Best Practices
+- Formuliere konkret und praxisnah
+- Nutze professionelle Vergabesprache
+
+Antworte im JSON-Format mit allen Kapiteln als Felder.`
+
+        const requestBody = {
+            model: provider.model,
+            messages: [
+                { role: "system", content: "Du bist ein Experte für öffentliche Beschaffung." },
+                { role: "user", content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 8000
+        }
+
+        const response = $http.send({
+            url: provider.url,
+            method: "POST",
+            headers: provider.headers(apiKey),
+            body: JSON.stringify(requestBody),
+            timeout: 300
+        })
+
+        if (response.statusCode !== 200) {
+            throw new Error(`AI API error: ${response.statusCode}`)
+        }
+
+        const result = JSON.parse(response.raw)
+        const content = result.choices[0].message.content
+        
+        // Parse JSON response
+        let documentData
+        try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+                documentData = JSON.parse(jsonMatch[0])
+            } else {
+                documentData = JSON.parse(content)
+            }
+        } catch (parseError) {
+            throw new Error("Fehler beim Parsen der AI-Antwort")
+        }
+
+        // Replace placeholders in template
+        let renderedContent = template.get("template_content")
+        for (const [key, value] of Object.entries(documentData)) {
+            renderedContent = renderedContent.replace(new RegExp(`{{.${key}}}`, 'g'), value)
+        }
+
+        return e.json(200, {
+            success: true,
+            rendered_content: renderedContent,
+            document_data: documentData
+        })
+        
+    } catch (error) {
+        console.error("Error in template generation:", error)
+        return e.json(500, { error: error.message })
+    }
+}, $apis.requireAuth())
+
 console.log("✅ Bedarf routes registered")
