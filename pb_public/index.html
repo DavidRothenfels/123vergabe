@@ -1254,6 +1254,25 @@
 
     function backToProjects() {
       currentProject = null;
+      
+      // Clear document state when switching projects
+      currentDocument = null;
+      
+      // Reset document dropdown
+      const documentSelect = document.getElementById('documentSelect');
+      documentSelect.innerHTML = '<option value="">Noch keine Dokumente vorhanden</option>';
+      
+      // Clear document viewer
+      document.getElementById('documentViewer').innerHTML = `
+        <div style="text-align: center; color: #6b7280; padding: 2rem;">
+          <i data-feather="file-plus" style="width: 3rem; height: 3rem; margin-bottom: 1rem;"></i>
+          <p>Wählen Sie eine Prompt-Vorlage und ein Thema, um eine Leistungsbeschreibung zu generieren.</p>
+        </div>
+      `;
+      
+      // Disable copy button
+      document.getElementById('copyBtn').disabled = true;
+      
       showProjectScreen();
     }
 
@@ -1921,21 +1940,14 @@
       login();
     });
 
-    // Auto-refresh documents (simple polling every 10 seconds)
-    setInterval(async () => {
-      if (currentProject && document.getElementById('dashboardScreen').classList.contains('hidden') === false) {
-        await loadDocuments();
+    // Real-time updates with PocketBase realtime subscriptions
+    pb.collection('documents').subscribe('*', function (e) {
+      console.log('Document event:', e.action);
+      console.log('Document record:', e.record);
+      if (e.record.project_id === currentProject?.id) {
+        loadDocuments();
       }
-    }, 10000);
-
-    // Real-time updates would be better with PocketBase realtime subscriptions
-    // pb.collection('documents').subscribe('*', function (e) {
-    //   console.log(e.action);
-    //   console.log(e.record);
-    //   if (e.record.project_id === currentProject?.id) {
-    //     loadDocuments();
-    //   }
-    // });
+    });
     // Project Edit Popup Functions
     async function openProjectEditPopup() {
       const modal = document.getElementById('projectEditModal');
