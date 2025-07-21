@@ -15,6 +15,27 @@ if [ ! -f "./pocketbase" ]; then
     exit 1
 fi
 
+# Kill any existing PocketBase processes first
+if pgrep -f "pocketbase serve" > /dev/null; then
+    echo "⚠️  Found existing PocketBase process, stopping it..."
+    pkill -f "pocketbase serve"
+    sleep 2
+fi
+
+# Double-check the port is free
+if lsof -Pi :8090 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️  Port 8090 is still in use, force killing..."
+    lsof -Pi :8090 -sTCP:LISTEN -t | xargs kill -9 2>/dev/null
+    sleep 1
+fi
+
+# Check if OpenRouter API key is set
+if [ -z "$OPENROUTER_API_KEY" ]; then
+    echo "⚠️  Warning: OPENROUTER_API_KEY not set. AI features will not work."
+    echo "   Set it with: export OPENROUTER_API_KEY='your-key'"
+    echo ""
+fi
+
 # Create necessary directories (same as Docker)
 mkdir -p pb_data pb_logs temp
 

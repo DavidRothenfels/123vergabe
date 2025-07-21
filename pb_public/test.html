@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>123vergabe - Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>123vergabe - System Test</h1>
+        
+        <div class="test-section">
+            <h2>1. Login Test</h2>
+            <input type="email" id="email" placeholder="E-Mail" value="test@vergabe.de">
+            <input type="password" id="password" placeholder="Passwort" value="vergabe123">
+            <button onclick="testLogin()">Login testen</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Mock Question Generation Test</h2>
+            <textarea id="description" rows="3" placeholder="Projektbeschreibung">Büroräumerenovierung - Wir planen die Renovierung unserer Büroräume</textarea>
+            <button onclick="testMockQuestions()">Mock Fragen generieren</button>
+            <div id="questionsResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Project Creation Test</h2>
+            <input type="text" id="projectName" placeholder="Projektname" value="Test Projekt Browser">
+            <textarea id="projectDesc" rows="2" placeholder="Projektbeschreibung">Browser Test Projekt</textarea>
+            <button onclick="testProjectCreate()">Projekt erstellen</button>
+            <div id="projectResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. API Key Test</h2>
+            <input type="text" id="apiKey" placeholder="API Key" value="test-key-123">
+            <button onclick="testApiKey()">API Key speichern</button>
+            <div id="apiKeyResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Status</h2>
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="/pb_public/js/pocketbase.umd.js"></script>
+    <script>
+        // Initialize PocketBase
+        const pb = new PocketBase('http://localhost:8090');
+        let currentUser = null;
+
+        function updateStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            status.innerHTML += `<div class="${isError ? 'error' : 'success'}">[${timestamp}] ${message}</div>`;
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+            
+            try {
+                const authData = await pb.collection('users').authWithPassword(email, password);
+                currentUser = authData.record;
+                resultDiv.innerHTML = `<span class="success">✅ Login erfolgreich! User ID: ${currentUser.id}</span>`;
+                updateStatus('Login erfolgreich');
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Login fehlgeschlagen: ${error.message}</span>`;
+                updateStatus('Login fehlgeschlagen: ' + error.message, true);
+            }
+        }
+
+        async function testMockQuestions() {
+            const description = document.getElementById('description').value;
+            const resultDiv = document.getElementById('questionsResult');
+            
+            if (!pb.authStore.isValid) {
+                resultDiv.innerHTML = '<span class="error">❌ Bitte zuerst einloggen!</span>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/generate-questions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': pb.authStore.token
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        ai_provider: 'mock'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<span class="success">✅ Mock Fragen generiert!</span>\n`;
+                    resultDiv.innerHTML += `Bedarf ID: ${data.bedarf_id}\n`;
+                    resultDiv.innerHTML += `Anzahl Fragen: ${data.questions?.length || 0}\n`;
+                    if (data.questions && data.questions.length > 0) {
+                        resultDiv.innerHTML += `\nErste Frage: ${data.questions[0].text}`;
+                    }
+                    updateStatus('Mock Fragen erfolgreich generiert');
+                } else {
+                    throw new Error(data.error || 'Unbekannter Fehler');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Fehler: ${error.message}</span>`;
+                updateStatus('Fragen-Generierung fehlgeschlagen: ' + error.message, true);
+            }
+        }
+
+        async function testProjectCreate() {
+            const name = document.getElementById('projectName').value;
+            const description = document.getElementById('projectDesc').value;
+            const resultDiv = document.getElementById('projectResult');
+            
+            if (!pb.authStore.isValid) {
+                resultDiv.innerHTML = '<span class="error">❌ Bitte zuerst einloggen!</span>';
+                return;
+            }
+            
+            try {
+                const record = await pb.collection('projects').create({
+                    name: name,
+                    description: description,
+                    user_id: currentUser.id,
+                    request_id: 'REQ' + Date.now()
+                });
+                
+                resultDiv.innerHTML = `<span class="success">✅ Projekt erstellt! ID: ${record.id}</span>`;
+                updateStatus('Projekt erfolgreich erstellt');
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Fehler: ${error.message}</span>`;
+                updateStatus('Projekt-Erstellung fehlgeschlagen: ' + error.message, true);
+            }
+        }
+
+        async function testApiKey() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultDiv = document.getElementById('apiKeyResult');
+            
+            if (!pb.authStore.isValid) {
+                resultDiv.innerHTML = '<span class="error">❌ Bitte zuerst einloggen!</span>';
+                return;
+            }
+            
+            try {
+                const record = await pb.collection('apikeys').create({
+                    user_id: currentUser.id,
+                    api_key: apiKey,
+                    provider: 'openai',
+                    name: 'Test Key',
+                    active: true
+                });
+                
+                resultDiv.innerHTML = `<span class="success">✅ API Key gespeichert! ID: ${record.id}</span>`;
+                updateStatus('API Key erfolgreich gespeichert');
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Fehler: ${error.message}</span>`;
+                updateStatus('API Key speichern fehlgeschlagen: ' + error.message, true);
+            }
+        }
+
+        // Auto-login on page load for convenience
+        window.onload = function() {
+            updateStatus('Test-Seite geladen. Bitte mit Login starten.');
+        }
+    </script>
+</body>
+</html>

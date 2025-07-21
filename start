@@ -1,0 +1,2 @@
+export OPENROUTER_API_KEY="dein-openrouter-key"
+  ./pocketbase serve --http=0.0.0.0:8090

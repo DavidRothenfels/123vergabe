@@ -10,33 +10,44 @@
   <link rel="icon" href="./assets/favicon-16x16.png" sizes="16x16" type="image/png">
   <link rel="icon" href="./assets/favicon-32x32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="./assets/favicon-48x48.png">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Feather Icons -->
   <script src="https://unpkg.com/feather-icons"></script>
   <!-- PocketBase SDK - CDN -->
   <script type="text/javascript" src="https://unpkg.com/pocketbase@0.26.1/dist/pocketbase.umd.js"></script>
   <style>
-    /* --- Basis-Styling wie debug.html --- */
+    /* --- Modern Design System --- */
     :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --secondary: #f59e0b;
+      --dark: #111827;
+      --light: #f9fafb;
+      --gray: #6b7280;
+      --gray-light: #e5e7eb;
       --bg: #fff;
-      --fg: #000;
-      --shadow: rgba(0,0,0,0.1);
-      --success: #28a745;
-      --error: #dc3545;
-      --warning: #ffc107;
-      --info: #17a2b8;
-      --primary: #007bff;
+      --fg: #111827;
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --success: #10b981;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --info: #3b82f6;
       --mono: 'Source Code Pro', 'Courier New', monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: #f5f5f5;
       color: var(--fg);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       line-height: 1.6;
       min-height: 100vh;
     }
 
-    /* --- Lovable-inspired Layout --- */
+    /* --- Modern Layout --- */
     .app-container {
       display: grid;
       grid-template-columns: 280px 1fr;
@@ -46,9 +57,9 @@
     /* Sidebar */
     .sidebar {
       background: var(--bg);
-      border-right: 1px solid #e1e5e9;
+      border-right: 1px solid var(--gray-light);
       padding: 2rem 1.5rem;
-      box-shadow: 2px 0 10px var(--shadow);
+      box-shadow: var(--shadow);
     }
 
     .logo {
@@ -223,7 +234,9 @@
     }
 
     .btn-primary:hover {
-      background: #0056b3;
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-lg);
     }
 
     .btn-secondary {
@@ -618,6 +631,33 @@
       color: #374151;
     }
 
+    /* Project Delete Button */
+    .project-delete-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: white;
+      border: 1px solid #e5e7eb;
+      font-size: 0.875rem;
+      cursor: pointer;
+      color: #ef4444;
+      padding: 0.25rem;
+      border-radius: 0.25rem;
+      transition: all 0.2s;
+      opacity: 0;
+      z-index: 10;
+    }
+
+    .project-card:hover .project-delete-btn {
+      opacity: 1;
+    }
+
+    .project-delete-btn:hover {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #dc2626;
+    }
+
     /* Responsive */
     @media (max-width: 1024px) {
       .project-grid {
@@ -791,24 +831,32 @@
 <body>
   <!-- Login Screen -->
   <div id="loginScreen" class="login-screen">
+    <div style="position: absolute; top: 2rem; right: 2rem;">
+      <a href="/landing.html" style="color: var(--primary); text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+        <i data-feather="home" style="width: 18px; height: 18px;"></i>
+        Zur Startseite
+      </a>
+    </div>
     <div class="login-card">
       <div class="login-header">
-        <h1>123vergabe</h1>
+        <h1 style="color: var(--primary); font-size: 2.5rem; margin-bottom: 0.5rem;">123<span style="color: var(--dark);">vergabe</span></h1>
+        <p style="color: var(--gray); font-size: 1.125rem;">Intelligente Vergabedokumente</p>
       </div>
 
-      <form id="loginForm" class="input-section">
+      <form id="loginForm" class="input-section" style="margin-top: 2rem;">
         <div class="form-group">
-          <label for="email">E-Mail</label>
-          <input type="email" id="email" required value="test@vergabe.de">
+          <label for="email" style="color: var(--dark); font-weight: 500;">E-Mail</label>
+          <input type="email" id="email" required value="test@vergabe.de" style="border: 1px solid var(--gray-light); border-radius: 0.5rem; padding: 0.75rem; font-size: 1rem;">
         </div>
         
         <div class="form-group">
-          <label for="password">Passwort</label>
-          <input type="password" id="password" required value="vergabe123">
+          <label for="password" style="color: var(--dark); font-weight: 500;">Passwort</label>
+          <input type="password" id="password" required value="vergabe123" style="border: 1px solid var(--gray-light); border-radius: 0.5rem; padding: 0.75rem; font-size: 1rem;">
         </div>
 
-        <button type="submit" class="btn btn-secondary">
-          <i data-feather="log-in" style="color: #f97316;"></i>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-size: 1rem; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          <i data-feather="log-in" style="width: 18px; height: 18px;"></i>
+          Anmelden
         </button>
       </form>
 
@@ -824,8 +872,8 @@
     <div class="app-container">
       <div class="sidebar">
         <div class="logo">
-          <i data-feather="layers" style="color: #f97316;"></i>
-          <span>123vergabe</span>
+          <i data-feather="layers" style="color: var(--primary);"></i>
+          <span style="color: var(--primary);">123<span style="color: var(--dark);">vergabe</span></span>
         </div>
 
 
@@ -884,8 +932,8 @@
     <div class="app-container">
       <div class="sidebar">
         <div class="logo">
-          <i data-feather="layers" style="color: #f97316;"></i>
-          <span>123vergabe</span>
+          <i data-feather="layers" style="color: var(--primary);"></i>
+          <span style="color: var(--primary);">123<span style="color: var(--dark);">vergabe</span></span>
         </div>
 
         <div class="nav-section">
@@ -937,7 +985,13 @@
             <div class="input-section">
 
               <div class="form-group">
-                <label for="themaInput">Beschreibung</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <label for="themaInput">Beschreibung</label>
+                  <button onclick="showExampleModal()" class="btn btn-secondary" style="font-size: 0.875rem; padding: 0.25rem 0.75rem;">
+                    <i data-feather="book-open" style="width: 16px; height: 16px;"></i>
+                    Beispiele
+                  </button>
+                </div>
                 <textarea id="themaInput" placeholder="Beschreiben Sie Ihr Projekt..."></textarea>
               </div>
 
@@ -970,8 +1024,8 @@
                 </div>
               </div>
 
-              <!-- Live Logs -->
-              <div style="margin-top: 1rem;">
+              <!-- Live Logs (hidden) -->
+              <div style="margin-top: 1rem; display: none;">
                 <div id="liveLogs" class="logs">
                   <div class="log-entry">
                     <span class="log-timestamp">[Ready]</span> System bereit für Generierung...
@@ -1078,8 +1132,10 @@
   </div>
 
   <script>
+    // Initialize PocketBase
+    const pb = new PocketBase(window.location.origin);
+    
     // Global variables
-    let pb;
     let currentUser = null;
     let currentProject = null;
     let currentDocument = null;
@@ -1146,8 +1202,21 @@
     let currentAnswers = {};
 
     function openBedarfModal() {
+      // Get description from main input field
+      const description = document.getElementById('themaInput').value.trim();
+      
+      if (!description) {
+        showSnackbar('Bitte geben Sie zuerst eine Beschreibung ein', 'warning');
+        return;
+      }
+      
       document.getElementById('bedarfModal').classList.add('show');
       resetBedarfModal();
+      
+      // Start directly with question generation
+      document.getElementById('bedarfDescription').value = description;
+      generateQuestions();
+      
       feather.replace();
     }
 
@@ -1157,41 +1226,39 @@
     }
 
     function resetBedarfModal() {
-      // Reset to phase 1
-      showBedarfPhase(1);
-      document.getElementById('bedarfDescription').value = '';
+      // Reset modal state
       currentBedarfId = null;
       currentQuestions = [];
       currentAnswers = {};
+      // Don't reset description as it comes from main input
     }
 
-    function showBedarfPhase(phase) {
-      // Update progress indicators
-      for (let i = 1; i <= 4; i++) {
-        const step = document.getElementById(`phase${i}`);
-        const content = document.getElementById(`bedarfPhase${i}`);
-        
-        if (i <= phase) {
-          step.classList.add('active');
-        } else {
-          step.classList.remove('active');
-        }
-        
-        if (i === phase) {
-          content.classList.remove('hidden');
-        } else {
-          content.classList.add('hidden');
-        }
+    function applyBedarfDescription() {
+      // Generate comprehensive description from Q&A
+      generateDescriptionFromQA();
+    }
+    
+    function showBedarfLoading(show, text = 'Fragen werden generiert...') {
+      const loadingDiv = document.getElementById('bedarfLoading');
+      const loadingText = loadingDiv.querySelector('p');
+      
+      loadingDiv.style.display = show ? 'flex' : 'none';
+      document.getElementById('questionsContainer').style.display = show ? 'none' : 'block';
+      
+      if (loadingText && text) {
+        loadingText.textContent = text;
       }
     }
 
-    async function generateBedarfQuestions() {
+    async function generateQuestions() {
       const description = document.getElementById('bedarfDescription').value.trim();
       
       if (!description) {
-        showSnackbar('Bitte beschreiben Sie Ihr Vorhaben', 'warning');
+        showSnackbar('Keine Beschreibung vorhanden', 'error');
         return;
       }
+      
+      showBedarfLoading(true);
 
       try {
         showSnackbar('Fragen werden generiert...', 'processing');
@@ -1205,8 +1272,7 @@
           ai_provider: 'openrouter'
         };
         
-        const bedarf = await pb.collection('bedarf').create(bedarfData);
-        currentBedarfId = bedarf.id;
+        // Skip creating bedarf record here - will be created by API
         
         // Generate questions
         const response = await fetch('/api/generate-questions', {
@@ -1217,13 +1283,15 @@
           },
           body: JSON.stringify({
             description: description,
-            bedarf_id: currentBedarfId,
+            project_id: currentProject?.id,
             ai_provider: 'openrouter'
           })
         });
 
         if (!response.ok) {
-          throw new Error('Fehler beim Generieren der Fragen');
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || 'Fehler beim Generieren der Fragen');
         }
 
         const result = await response.json();
@@ -1240,31 +1308,54 @@
     }
 
     function renderQuestions() {
-      const container = document.getElementById('questionsContainer');
+      const container = document.getElementById('questionsList');
       container.innerHTML = '';
+      
+      showBedarfLoading(false);
       
       currentQuestions.forEach((question, index) => {
         const questionDiv = document.createElement('div');
         questionDiv.className = 'question-card';
+        
+        let optionsHtml = '';
+        
+        // Check if question has options (multiple choice)
+        if (question.options && Array.isArray(question.options) && question.options.length > 0) {
+          optionsHtml = `
+            <div class="question-options">
+              ${question.options.map((opt, i) => `
+                <label>
+                  <input type="checkbox" name="q${question.id}" value="${opt}" onchange="updateAnswer('${question.id}', '${opt}', this.checked)">
+                  ${opt}
+                </label>
+              `).join('')}
+            </div>
+            ${question.allow_other ? `
+              <textarea 
+                rows="2" 
+                placeholder="Weitere Details..." 
+                onchange="updateAnswerText('${question.id}', this.value)"
+                style="width: 100%; margin-top: 0.5rem;"
+              ></textarea>
+            ` : ''}
+          `;
+        } else {
+          // Fallback to text input for questions without options
+          optionsHtml = `
+            <div class="question-options">
+              <textarea 
+                rows="3" 
+                placeholder="Ihre Antwort..." 
+                onchange="updateAnswerText('${question.id}', this.value)"
+                style="width: 100%; padding: 0.5rem; border: 1px solid #e1e5e9; border-radius: 0.25rem;"
+              ></textarea>
+            </div>
+          `;
+        }
+        
         questionDiv.innerHTML = `
-          <span class="question-priority ${question.priority}">${question.priority === 'high' ? 'Hoch' : question.priority === 'medium' ? 'Mittel' : 'Niedrig'}</span>
           <h4>${question.text}</h4>
-          <div class="question-options">
-            ${question.options.map((opt, i) => `
-              <label>
-                <input type="checkbox" name="q${question.id}" value="${opt}" onchange="updateAnswer('${question.id}', '${opt}', this.checked)">
-                ${opt}
-              </label>
-            `).join('')}
-          </div>
-          ${question.allow_other ? `
-            <textarea 
-              rows="2" 
-              placeholder="Weitere Details..." 
-              onchange="updateAnswerText('${question.id}', this.value)"
-              style="width: 100%; margin-top: 0.5rem;"
-            ></textarea>
-          ` : ''}
+          ${optionsHtml}
         `;
         container.appendChild(questionDiv);
       });
@@ -1308,7 +1399,7 @@
             'Authorization': pb.authStore.token
           },
           body: JSON.stringify({
-            bedarf_id: currentBedarfId,
+            bedarf_id: currentBedarfId || null,
             answers: currentAnswers,
             ai_provider: 'openrouter'
           })
@@ -1334,9 +1425,10 @@
       }
     }
 
-    async function submitBedarfAnswers() {
+    async function generateDescriptionFromQA() {
       try {
-        showBedarfPhase(3);
+        showBedarfLoading(true);
+        showSnackbar('Beschreibung wird erstellt...', 'processing');
         
         // Generate a comprehensive description from questions and answers
         const response = await fetch('/api/generate-description', {
@@ -1346,7 +1438,7 @@
             'Authorization': pb.authStore.token
           },
           body: JSON.stringify({
-            bedarf_id: currentBedarfId,
+            bedarf_id: currentBedarfId || null,
             initial_description: document.getElementById('bedarfDescription').value,
             questions: currentQuestions,
             answers: currentAnswers,
@@ -1355,7 +1447,9 @@
         });
 
         if (!response.ok) {
-          throw new Error('Fehler beim Generieren der Beschreibung');
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || 'Fehler beim Generieren der Beschreibung');
         }
 
         const result = await response.json();
@@ -1363,32 +1457,19 @@
         // Update the main description field with the comprehensive description
         document.getElementById('themaInput').value = result.description;
         
-        // Show success message in phase 4
-        document.getElementById('bedarfDocumentContent').innerHTML = `
-          <div style="text-align: center; padding: 2rem;">
-            <div style="font-size: 3rem; color: var(--success); margin-bottom: 1rem;">✓</div>
-            <h3 style="margin-bottom: 1rem;">Beschreibung wurde präzisiert!</h3>
-            <p style="color: #6b7280;">Die detaillierte Beschreibung wurde in das Hauptfeld übertragen.</p>
-            <p style="color: #6b7280;">Sie können jetzt auf "Dokument generieren" klicken.</p>
-          </div>
-        `;
-        showBedarfPhase(4);
+        // Show success message and close modal
+        showSnackbar('Beschreibung wurde erfolgreich präzisiert!', 'success');
+        closeBedarfModal();
         
-        // Close modal after 3 seconds
-        setTimeout(() => {
-          closeBedarfModal();
-          // Highlight the generate button
-          const btn = document.getElementById('generateBtn');
-          btn.style.boxShadow = '0 0 0 3px rgba(0, 123, 255, 0.5)';
-          setTimeout(() => {
-            btn.style.boxShadow = '';
-          }, 2000);
-        }, 3000);
+        // Update current project description if needed
+        if (currentProject) {
+          updateCurrentProjectDescription();
+        }
         
       } catch (error) {
         console.error('Error submitting answers:', error);
         showSnackbar('Fehler: ' + error.message, 'error');
-        showBedarfPhase(2);
+        showBedarfLoading(false);
       }
     }
 
@@ -1405,9 +1486,7 @@
 
     // Initialize app
     window.onload = async () => {
-      // Initialize PocketBase - auto-detect URL
-      const baseURL = window.location.origin;
-      pb = new PocketBase(baseURL);
+      // PocketBase already initialized at the top
       
       // Initialize Feather icons
       feather.replace();
@@ -1477,24 +1556,9 @@
       loadPrompts();
       loadDocuments();
       
-      // Add event handler for prompt selection
-      document.getElementById('promptSelect').addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        // System prompts should NOT populate the description field
-        // They are used for document generation templates only
-        if (selectedOption && selectedOption.dataset.isSystem !== 'true' && selectedOption.dataset.promptText) {
-          document.getElementById('themaInput').value = selectedOption.dataset.promptText;
-        }
-      });
+      // Prompt selection removed - using template-based generation
 
-      // Add event handler for examples button
-      const exampleBtn = document.getElementById('exampleBtn');
-      if (exampleBtn) {
-        exampleBtn.addEventListener('click', showExampleModal);
-        console.log('Examples button event listener attached');
-      } else {
-        console.error('Examples button not found');
-      }
+      // Examples button removed - not needed anymore
 
       // Add event handler for description sync
       document.getElementById('themaInput').addEventListener('input', function() {
@@ -1621,11 +1685,16 @@
         const description = project.description || 'Keine Beschreibung';
         
         return `
-        <div class="project-card" onclick="selectProject('${project.id}')">
-          <h3 style="font-weight: 600; margin-bottom: 0.5rem;">${project.name}</h3>
-          <p class="project-description" title="${description}">${description}</p>
-          <div style="display: flex; justify-content: flex-start; align-items: center; font-size: 0.75rem; color: #6b7280;">
-            <span>${new Date(project.created).toLocaleDateString('de-DE')}</span>
+        <div class="project-card" style="position: relative;">
+          <button class="project-delete-btn" onclick="event.stopPropagation(); deleteProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')" title="Projekt löschen">
+            <i data-feather="trash-2"></i>
+          </button>
+          <div onclick="selectProject('${project.id}')">
+            <h3 style="font-weight: 600; margin-bottom: 0.5rem;">${project.name}</h3>
+            <p class="project-description" title="${description}">${description}</p>
+            <div style="display: flex; justify-content: flex-start; align-items: center; font-size: 0.75rem; color: #6b7280;">
+              <span>${new Date(project.created).toLocaleDateString('de-DE')}</span>
+            </div>
           </div>
         </div>
         `;
@@ -1734,6 +1803,96 @@
       }
     }
 
+    async function deleteProject(projectId, projectName) {
+      // Bestätigungsdialog
+      const modal = document.createElement('div');
+      modal.className = 'modal show';
+      modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+          <div class="modal-header">
+            <h3><i data-feather="alert-triangle" style="color: #ef4444;"></i>Projekt löschen</h3>
+            <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+          </div>
+          <div class="modal-body">
+            <p>Möchten Sie das Projekt "<strong>${projectName}</strong>" wirklich löschen?</p>
+            <p style="color: #ef4444; font-size: 0.875rem; margin-top: 1rem;">
+              ⚠️ Diese Aktion kann nicht rückgängig gemacht werden. Alle zugehörigen Dokumente und Daten werden ebenfalls gelöscht.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Abbrechen</button>
+            <button class="btn" style="background: #ef4444; color: white;" onclick="confirmDeleteProject('${projectId}', this.closest('.modal'))">
+              <i data-feather="trash-2"></i> Löschen
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      feather.replace();
+    }
+
+    async function confirmDeleteProject(projectId, modal) {
+      try {
+        showSnackbar('Projekt wird gelöscht...', 'info');
+        
+        // Zuerst alle abhängigen Datensätze löschen
+        try {
+          // Lösche alle user_needs Einträge für dieses Projekt
+          const userNeeds = await pb.collection('user_needs').getList(1, 100, {
+            filter: `project_id = "${projectId}"`
+          });
+          
+          for (const need of userNeeds.items) {
+            await pb.collection('user_needs').delete(need.id);
+          }
+          
+          // Lösche alle documents für dieses Projekt
+          const documents = await pb.collection('documents').getList(1, 100, {
+            filter: `project_id = "${projectId}"`
+          });
+          
+          for (const doc of documents.items) {
+            await pb.collection('documents').delete(doc.id);
+          }
+          
+          // Lösche alle generation_requests für dieses Projekt
+          const genRequests = await pb.collection('generation_requests').getList(1, 100, {
+            filter: `project_id = "${projectId}"`
+          });
+          
+          for (const req of genRequests.items) {
+            await pb.collection('generation_requests').delete(req.id);
+          }
+          
+        } catch (e) {
+          console.log('Info: Keine abhängigen Datensätze gefunden oder bereits gelöscht');
+        }
+        
+        // Jetzt das Projekt selbst löschen
+        await pb.collection('projects').delete(projectId);
+        
+        // Wenn es das aktuelle Projekt war, zurück zur Projektliste
+        if (currentProject && currentProject.id === projectId) {
+          currentProject = null;
+          showProjectList();
+        }
+        
+        // Projektliste neu laden
+        await loadProjects();
+        
+        // Modal schließen
+        modal.remove();
+        
+        showSnackbar('Projekt und alle zugehörigen Daten erfolgreich gelöscht', 'success');
+        log('🗑️ Projekt und abhängige Daten gelöscht');
+        
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        showSnackbar('Fehler beim Löschen: ' + error.message, 'error');
+      }
+    }
+
     async function updateCurrentProjectDescription() {
       if (currentProject) {
         try {
@@ -1803,20 +1962,8 @@
     }
 
     function renderPrompts() {
-      const select = document.getElementById('promptSelect');
-      select.innerHTML = '<option value="">Dokumentenart wählen...</option>';
-      
-      // Only add system prompts to dropdown - examples are popup-only
-      if (systemPrompts.length > 0) {
-        systemPrompts.forEach(prompt => {
-          const option = document.createElement('option');
-          option.value = `system_${prompt.id}`;
-          option.textContent = prompt.description || prompt.prompt_type;
-          option.dataset.promptText = prompt.prompt_text;
-          option.dataset.isSystem = 'true';
-          select.appendChild(option);
-        });
-      }
+      // Prompt selection removed - only load examples for popup
+      // System prompts are no longer needed as we use templates
     }
 
     // Document management
@@ -2759,86 +2906,41 @@
     <div class="modal-content" style="max-width: 900px;">
       <div class="modal-header">
         <h2>
-          <i data-feather="target"></i>
-          Bedarfsanalyse
+          <i data-feather="message-square"></i>
+          Beschreibung präzisieren
         </h2>
         <button class="modal-close" onclick="closeBedarfModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <!-- Phase Progress -->
-        <div class="phase-progress" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-          <div class="phase-step active" id="phase1">
-            <div class="phase-number">1</div>
-            <div class="phase-label">Beschreibung</div>
-          </div>
-          <div class="phase-step" id="phase2">
-            <div class="phase-number">2</div>
-            <div class="phase-label">Fragen</div>
-          </div>
-          <div class="phase-step" id="phase3">
-            <div class="phase-number">3</div>
-            <div class="phase-label">Generierung</div>
-          </div>
-          <div class="phase-step" id="phase4">
-            <div class="phase-number">4</div>
-            <div class="phase-label">Dokument</div>
-          </div>
+        <!-- Hidden input for description -->
+        <input type="hidden" id="bedarfDescription" />
+        
+        <!-- Loading State -->
+        <div id="bedarfLoading" class="loading-state" style="display: none; flex-direction: column; align-items: center; justify-content: center; padding: 4rem;">
+          <div class="spinner"></div>
+          <p style="margin-top: 1rem; color: #007bff; font-weight: 500;">Fragen werden generiert...</p>
         </div>
 
-        <!-- Phase 1: Input -->
-        <div id="bedarfPhase1" class="phase-content">
-          <div class="form-group">
-            <label for="bedarfDescription">Beschreiben Sie Ihr Beschaffungsvorhaben:</label>
-            <textarea id="bedarfDescription" rows="6" placeholder="Beschreiben Sie möglichst detailliert, was Sie beschaffen möchten..."></textarea>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" onclick="generateBedarfQuestions()">
-              <i data-feather="message-square"></i>
-              Fragen generieren
-            </button>
-          </div>
-        </div>
-
-        <!-- Phase 2: Questions -->
-        <div id="bedarfPhase2" class="phase-content hidden">
-          <div id="questionsContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <!-- Questions Container -->
+        <div id="questionsContainer" style="display: none;">
+          <p style="margin-bottom: 1.5rem; color: #6b7280;">
+            Beantworten Sie die folgenden Fragen, um Ihre Beschreibung zu präzisieren:
+          </p>
+          <div id="questionsList" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
             <!-- Questions will be populated here -->
           </div>
-          <div class="modal-footer" style="justify-content: space-between;">
+          <div class="modal-footer" style="justify-content: space-between; margin-top: 2rem;">
             <button class="btn btn-secondary" onclick="requestMoreQuestions()">
               <i data-feather="plus-circle"></i>
               Weitere Fragen
             </button>
-            <button class="btn btn-primary" onclick="submitBedarfAnswers()">
-              <i data-feather="file-text"></i>
-              Dokument generieren
-            </button>
-          </div>
-        </div>
-
-        <!-- Phase 3: Generation -->
-        <div id="bedarfPhase3" class="phase-content hidden">
-          <div style="text-align: center; padding: 3rem;">
-            <div class="spinner" style="margin: 0 auto 2rem;"></div>
-            <h3>Dokument wird generiert...</h3>
-            <p style="color: #6b7280;">Dies kann einige Minuten dauern.</p>
-          </div>
-        </div>
-
-        <!-- Phase 4: Result -->
-        <div id="bedarfPhase4" class="phase-content hidden">
-          <div class="document-preview" style="border: 1px solid #e1e5e9; border-radius: 0.5rem; padding: 2rem; max-height: 60vh; overflow-y: auto;">
-            <div id="bedarfDocumentContent">
-              <!-- Generated document will be shown here -->
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" onclick="closeBedarfModal()">
+            <button class="btn btn-primary" onclick="applyBedarfDescription()">
               <i data-feather="check"></i>
-              Schließen
+              Beschreibung präzisieren
             </button>
           </div>
         </div>
+
       </div>
     </div>
   </div>

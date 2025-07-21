@@ -2,8 +2,8 @@
 
 console.log("📄 Loading bedarf.pb.js...")
 
-// AI Provider configuration
-const AI_PROVIDERS = {
+// AI Provider configuration (using var for global scope in PocketBase)
+var AI_PROVIDERS = {
     openrouter: {
         url: "https://openrouter.ai/api/v1/chat/completions",
         headers: (apiKey) => ({
@@ -13,46 +13,28 @@ const AI_PROVIDERS = {
             "Content-Type": "application/json"
         }),
         model: "anthropic/claude-3.5-sonnet"
-    },
-    bbk_proxy: {
-        url: "http://localhost:8000/v1/chat/completions",
-        headers: () => ({
-            "Content-Type": "application/json"
-        }),
-        model: "gpt-4o-mini"
-    },
-    openrouter_proxy: {
-        url: "http://localhost:8001/v1/chat/completions",
-        headers: () => ({
-            "Content-Type": "application/json"
-        }),
-        model: "anthropic/claude-3.5-sonnet"
     }
 }
 
 // Helper function to get AI provider settings
-function getAIProvider(providerName) {
-    const provider = AI_PROVIDERS[providerName] || AI_PROVIDERS.openrouter
-    return provider
-}
+// Note: In PocketBase hooks, sometimes function scope issues occur
+// If getAIProvider is not accessible, use AI_PROVIDERS directly
 
 // Route: Generate questions based on initial description
 routerAdd("POST", "/api/generate-questions", (e) => {
+    console.log("=== /api/generate-questions called ===")
+    console.log("Request method:", e.request.method)
+    console.log("Request URL:", e.request.url)
+    console.log("Auth:", e.auth ? "authenticated" : "not authenticated")
+    
     try {
+        // Wrap everything to catch all errors
+        console.log("Starting request processing...")
         // Parse JSON body
         let data = {}
         try {
-            // In PocketBase hooks, request data is accessed directly
-            const rawData = e.request.data()
-            if (rawData && typeof rawData === 'object') {
-                data = rawData
-            } else {
-                // Try to parse as JSON string
-                const bodyStr = e.request.bodyRaw()
-                if (bodyStr) {
-                    data = JSON.parse(bodyStr)
-                }
-            }
+            // Get parsed body directly (PocketBase v0.28 API)
+            data = e.requestInfo().body || {}
         } catch (err) {
             console.log("Body parsing error:", err)
             throw new Error("Invalid JSON body: " + err.message)
@@ -71,8 +53,25 @@ routerAdd("POST", "/api/generate-questions", (e) => {
         const bedarfId = data.bedarf_id
         const aiProvider = data.ai_provider || "openrouter"
         
+        console.log("AI Provider:", aiProvider)
+        console.log("Bedarf ID:", bedarfId)
+        
         // Get provider configuration
-        const provider = getAIProvider(aiProvider)
+        const providers = {
+            openrouter: {
+                url: "https://openrouter.ai/api/v1/chat/completions",
+                headers: (apiKey) => ({
+                    "Authorization": `Bearer ${apiKey}`,
+                    "HTTP-Referer": "http://localhost:8090",
+                    "X-Title": "123vergabe",
+                    "Content-Type": "application/json"
+                }),
+                model: "anthropic/claude-3.5-sonnet"
+            }
+        }
+        const provider = providers[aiProvider] || providers.openrouter
+        
+        // Direct to AI provider - no mock implementation
         
         // Generate questions using AI
         const prompt = `Du bist ein erfahrener Warengruppenmanager einer öffentlichen Vergabestelle und planst eine Ausschreibung für Beratungsdienstleistungen oder Software. Deine Aufgabe ist es, den Beschaffungsbedarf sehr detailliert festzustellen und ALLE Aspekte einer vollständigen Leistungsbeschreibung systematisch zu erfassen.
@@ -98,7 +97,7 @@ WICHTIG:
 - Stelle konkrete, auf das beschriebene Vorhaben zugeschnittene Fragen
 - Jede Frage soll einen spezifischen Aspekt der Leistungsbeschreibung abdecken
 - Nutze Multiple-Choice mit Freitextfeld für ergänzende Details
-- Priorisiere Fragen nach ihrer Bedeutung für die Ausschreibung
+- Die Fragen sollen logisch aufeinander aufbauen
 
 Format als JSON:
 {
@@ -107,7 +106,6 @@ Format als JSON:
       "id": "q1",
       "text": "Frage...",
       "category": "Kategoriename aus den 12 Bereichen",
-      "priority": "high|medium|low",
       "type": "multiple_choice",
       "options": ["Option 1", "Option 2", "Option 3"],
       "allow_other": true
@@ -128,7 +126,12 @@ Format als JSON:
         // Get API key if needed
         let headers = provider.headers()
         if (aiProvider === "openrouter") {
-            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().openrouter_api_key
+            console.log("OpenRouter API Key check:")
+            console.log("- From env:", process.env.OPENROUTER_API_KEY ? "present" : "missing")
+            console.log("- From settings:", $app.settings().openrouter_api_key ? "present" : "missing")
+            console.log("- Final API key:", apiKey ? `${apiKey.substring(0, 10)}...` : "NOT FOUND")
+            
             if (!apiKey) {
                 throw new Error("OpenRouter API key not configured")
             }
@@ -166,15 +169,32 @@ Format als JSON:
             throw new Error("Fehler beim Parsen der AI-Antwort")
         }
 
-        // Update bedarf record with questions
-        if (bedarfId) {
-            const bedarf = $app.dao().findRecordById("bedarf", bedarfId)
-            bedarf.set("questions", questions)
-            bedarf.set("status", "questions_generated")
-            $app.dao().saveRecord(bedarf)
+        // Create or update user_needs record with questions
+        let recordId = bedarfId
+        if (!bedarfId) {
+            // Create new record
+            const collection = $app.findCollectionByNameOrId("user_needs")
+            const newRecord = new Record(collection, {
+                user_id: userId,
+                project_id: data.project_id || null,
+                thema: data.description,
+                beschreibung: JSON.stringify(questions),
+                status: "created"
+            })
+            $app.save(newRecord)
+            recordId = newRecord.id
+        } else {
+            // Update existing record
+            const bedarf = $app.findRecordById("user_needs", bedarfId)
+            bedarf.set("beschreibung", JSON.stringify(questions))
+            bedarf.set("status", "created")
+            $app.save(bedarf)
         }
 
-        return e.json(200, questions)
+        return e.json(200, {
+            bedarf_id: recordId,
+            questions: questions.questions || questions
+        })
         
     } catch (error) {
         console.error("Error generating questions:", error)
@@ -188,17 +208,8 @@ routerAdd("POST", "/api/generate-additional-questions", (e) => {
         // Parse JSON body
         let data = {}
         try {
-            // In PocketBase hooks, request data is accessed directly
-            const rawData = e.request.data()
-            if (rawData && typeof rawData === 'object') {
-                data = rawData
-            } else {
-                // Try to parse as JSON string
-                const bodyStr = e.request.bodyRaw()
-                if (bodyStr) {
-                    data = JSON.parse(bodyStr)
-                }
-            }
+            // Get parsed body directly (PocketBase v0.28 API)
+            data = e.requestInfo().body || {}
         } catch (err) {
             console.log("Body parsing error:", err)
             throw new Error("Invalid JSON body: " + err.message)
@@ -215,7 +226,19 @@ routerAdd("POST", "/api/generate-additional-questions", (e) => {
         const aiProvider = data.ai_provider || "openrouter"
         
         // Get provider configuration
-        const provider = getAIProvider(aiProvider)
+        const providers = {
+            openrouter: {
+                url: "https://openrouter.ai/api/v1/chat/completions",
+                headers: (apiKey) => ({
+                    "Authorization": `Bearer ${apiKey}`,
+                    "HTTP-Referer": "http://localhost:8090",
+                    "X-Title": "123vergabe",
+                    "Content-Type": "application/json"
+                }),
+                model: "anthropic/claude-3.5-sonnet"
+            }
+        }
+        const provider = providers[aiProvider] || providers.openrouter
         
         // Build context from current answers
         let answersContext = "Bisherige Antworten:\n"
@@ -234,7 +257,21 @@ Generiere 3-5 zusätzliche, sehr spezifische Fragen, um noch fehlende Informatio
 - Details, die für eine vollständige Leistungsbeschreibung fehlen
 - Kritische Aspekte, die präzisiert werden müssen
 
-Format als JSON wie vorher.`
+WICHTIG: Verwende EXAKT dasselbe JSON-Format wie bei den initialen Fragen:
+{
+  "questions": [
+    {
+      "id": "q_add_1",
+      "text": "Frage...",
+      "category": "Kategoriename aus den 12 Bereichen",
+      "type": "multiple_choice",
+      "options": ["Option 1", "Option 2", "Option 3"],
+      "allow_other": true
+    }
+  ]
+}
+
+Stelle sicher, dass JEDE Frage ein "options" Array hat, auch wenn es nur Platzhalter-Optionen sind.`
 
         const requestBody = {
             model: provider.model,
@@ -249,7 +286,12 @@ Format als JSON wie vorher.`
         // Get API key if needed
         let headers = provider.headers()
         if (aiProvider === "openrouter") {
-            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().openrouter_api_key
+            console.log("OpenRouter API Key check:")
+            console.log("- From env:", process.env.OPENROUTER_API_KEY ? "present" : "missing")
+            console.log("- From settings:", $app.settings().openrouter_api_key ? "present" : "missing")
+            console.log("- Final API key:", apiKey ? `${apiKey.substring(0, 10)}...` : "NOT FOUND")
+            
             if (!apiKey) {
                 throw new Error("OpenRouter API key not configured")
             }
@@ -298,17 +340,8 @@ routerAdd("POST", "/api/submit-answers", (e) => {
         // Parse JSON body
         let data = {}
         try {
-            // In PocketBase hooks, request data is accessed directly
-            const rawData = e.request.data()
-            if (rawData && typeof rawData === 'object') {
-                data = rawData
-            } else {
-                // Try to parse as JSON string
-                const bodyStr = e.request.bodyRaw()
-                if (bodyStr) {
-                    data = JSON.parse(bodyStr)
-                }
-            }
+            // Get parsed body directly (PocketBase v0.28 API)
+            data = e.requestInfo().body || {}
         } catch (err) {
             console.log("Body parsing error:", err)
             throw new Error("Invalid JSON body: " + err.message)
@@ -329,12 +362,12 @@ routerAdd("POST", "/api/submit-answers", (e) => {
         }
 
         // Get bedarf record
-        const bedarf = $app.dao().findRecordById("bedarf", bedarfId)
-        const questions = bedarf.get("questions")?.questions || []
+        const bedarf = $app.findRecordById("user_needs", bedarfId)
+        const questions = bedarf.questions?.questions || []
         
         // Build comprehensive context
         let qaContext = "# Bedarfsanalyse Ergebnisse\n\n"
-        qaContext += `**Ursprüngliche Beschreibung:** ${bedarf.get("initial_description")}\n\n`
+        qaContext += `**Ursprüngliche Beschreibung:** ${bedarf.initial_description}\n\n`
         qaContext += "## Fragen und Antworten:\n\n"
         
         for (const question of questions) {
@@ -352,7 +385,19 @@ routerAdd("POST", "/api/submit-answers", (e) => {
         }
 
         // Get provider configuration
-        const provider = getAIProvider(aiProvider)
+        const providers = {
+            openrouter: {
+                url: "https://openrouter.ai/api/v1/chat/completions",
+                headers: (apiKey) => ({
+                    "Authorization": `Bearer ${apiKey}`,
+                    "HTTP-Referer": "http://localhost:8090",
+                    "X-Title": "123vergabe",
+                    "Content-Type": "application/json"
+                }),
+                model: "anthropic/claude-3.5-sonnet"
+            }
+        }
+        const provider = providers[aiProvider] || providers.openrouter
         
         const prompt = `Du bist ein Experte für öffentliche Beschaffung und erstellst professionelle Leistungsbeschreibungen. Basierend auf den folgenden Antworten aus einer Bedarfsanalyse, generiere strukturierte Inhalte für eine umfassende Leistungsbeschreibung.
 
@@ -393,7 +438,12 @@ Generiere das Ergebnis als JSON mit folgendem Format:
         // Get API key if needed
         let headers = provider.headers()
         if (aiProvider === "openrouter") {
-            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+            const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().openrouter_api_key
+            console.log("OpenRouter API Key check:")
+            console.log("- From env:", process.env.OPENROUTER_API_KEY ? "present" : "missing")
+            console.log("- From settings:", $app.settings().openrouter_api_key ? "present" : "missing")
+            console.log("- Final API key:", apiKey ? `${apiKey.substring(0, 10)}...` : "NOT FOUND")
+            
             if (!apiKey) {
                 throw new Error("OpenRouter API key not configured")
             }
@@ -432,16 +482,16 @@ Generiere das Ergebnis als JSON mit folgendem Format:
         bedarf.set("answers", answers)
         bedarf.set("document_data", documentData)
         bedarf.set("status", "document_generated")
-        $app.dao().saveRecord(bedarf)
+        $app.save(bedarf)
 
         // Get template
-        const templates = $app.dao().findRecordsByFilter("templates", "category = 'bedarf' && active = true", "", 1)
+        const templates = $app.findRecordsByFilter("templates", "category = 'bedarf' && active = true", "", 1)
         if (templates.length === 0) {
             throw new Error("Keine aktive Vorlage gefunden")
         }
         
         const template = templates[0]
-        let renderedContent = template.get("template_content")
+        let renderedContent = template.template_content
         
         // Replace placeholders
         for (const [key, value] of Object.entries(documentData)) {
@@ -449,19 +499,19 @@ Generiere das Ergebnis als JSON mit folgendem Format:
         }
 
         // Create document record
-        const documentsCollection = $app.dao().findCollectionByNameOrId("documents")
+        const documentsCollection = $app.findCollectionByNameOrId("documents")
         const docRecord = new Record(documentsCollection, {
-            title: `Leistungsbeschreibung: ${bedarf.get("initial_description").substring(0, 100)}...`,
+            title: `Leistungsbeschreibung: ${bedarf.initial_description.substring(0, 100)}...`,
             content: renderedContent,
-            document_type: "bedarf",
-            type: "bedarf",
+            document_type: "user_needs",
+            type: "user_needs",
             user_id: userId,
-            project_id: bedarf.get("project_id") || "",
+            project_id: bedarf.project_id || "",
             bedarf_id: bedarfId,
             generated_by_ai: true,
             created_by: userId
         })
-        $app.dao().saveRecord(docRecord)
+        $app.save(docRecord)
 
         return e.json(200, {
             success: true,
@@ -481,17 +531,8 @@ routerAdd("POST", "/api/generate-description", (e) => {
         // Parse JSON body
         let data = {}
         try {
-            // In PocketBase hooks, request data is accessed directly
-            const rawData = e.request.data()
-            if (rawData && typeof rawData === 'object') {
-                data = rawData
-            } else {
-                // Try to parse as JSON string
-                const bodyStr = e.request.bodyRaw()
-                if (bodyStr) {
-                    data = JSON.parse(bodyStr)
-                }
-            }
+            // Get parsed body directly (PocketBase v0.28 API)
+            data = e.requestInfo().body || {}
         } catch (err) {
             console.log("Body parsing error:", err)
             throw new Error("Invalid JSON body: " + err.message)
@@ -522,8 +563,22 @@ routerAdd("POST", "/api/generate-description", (e) => {
             }
         }
 
-        const provider = getAIProvider("openrouter")
-        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+        // Define provider inline to avoid scope issues
+        const provider = {
+            url: "https://openrouter.ai/api/v1/chat/completions",
+            headers: (apiKey) => ({
+                "Authorization": `Bearer ${apiKey}`,
+                "HTTP-Referer": "http://localhost:8090",
+                "X-Title": "123vergabe",
+                "Content-Type": "application/json"
+            }),
+            model: "anthropic/claude-3.5-sonnet"
+        }
+        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().openrouter_api_key
+        
+        if (!apiKey) {
+            throw new Error("OpenRouter API key not configured")
+        }
         
         const prompt = `Erstelle eine präzise und umfassende Projektbeschreibung basierend auf den folgenden Informationen:
 
@@ -575,17 +630,8 @@ routerAdd("POST", "/api/generate-from-template", (e) => {
         // Parse JSON body
         let data = {}
         try {
-            // In PocketBase hooks, request data is accessed directly
-            const rawData = e.request.data()
-            if (rawData && typeof rawData === 'object') {
-                data = rawData
-            } else {
-                // Try to parse as JSON string
-                const bodyStr = e.request.bodyRaw()
-                if (bodyStr) {
-                    data = JSON.parse(bodyStr)
-                }
-            }
+            // Get parsed body directly (PocketBase v0.28 API)
+            data = e.requestInfo().body || {}
         } catch (err) {
             console.log("Body parsing error:", err)
             throw new Error("Invalid JSON body: " + err.message)
@@ -604,7 +650,7 @@ routerAdd("POST", "/api/generate-from-template", (e) => {
         }
 
         // Get template
-        const templates = $app.dao().findRecordsByFilter("templates", 
+        const templates = $app.findRecordsByFilter("templates", 
             `category = '${template_category}' && active = true`, "", 1)
         
         if (templates.length === 0) {
@@ -612,11 +658,25 @@ routerAdd("POST", "/api/generate-from-template", (e) => {
         }
         
         const template = templates[0]
-        const placeholders = JSON.parse(template.get("placeholders") || "[]")
+        const placeholders = JSON.parse(template.placeholders || "[]")
         
         // Generate content for each placeholder
-        const provider = getAIProvider("openrouter")
-        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().get("openrouter_api_key")
+        // Define provider inline to avoid scope issues
+        const provider = {
+            url: "https://openrouter.ai/api/v1/chat/completions",
+            headers: (apiKey) => ({
+                "Authorization": `Bearer ${apiKey}`,
+                "HTTP-Referer": "http://localhost:8090",
+                "X-Title": "123vergabe",
+                "Content-Type": "application/json"
+            }),
+            model: "anthropic/claude-3.5-sonnet"
+        }
+        const apiKey = process.env.OPENROUTER_API_KEY || $app.settings().openrouter_api_key
+        
+        if (!apiKey) {
+            throw new Error("OpenRouter API key not configured")
+        }
         
         const prompt = `Basierend auf der folgenden Projektbeschreibung, erstelle detaillierte Inhalte für eine professionelle Leistungsbeschreibung:
 
@@ -672,7 +732,7 @@ Antworte im JSON-Format mit allen Kapiteln als Felder.`
         }
 
         // Replace placeholders in template
-        let renderedContent = template.get("template_content")
+        let renderedContent = template.template_content
         for (const [key, value] of Object.entries(documentData)) {
             renderedContent = renderedContent.replace(new RegExp(`{{.${key}}}`, 'g'), value)
         }

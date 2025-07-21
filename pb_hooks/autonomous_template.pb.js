@@ -20,31 +20,38 @@ onRecordCreateRequest((e) => {
             }
             
             const projectId = e.record.id
-            const projectName = e.record.get("name")
-            const description = e.record.get("description") || ""
-            const userId = e.record.get("user_id")
+            const projectName = e.record.name
+            const description = e.record.description || ""
+            const userId = e.record.user_id
+            
+            console.log("Debug values:")
+            console.log("- projectId:", projectId)
+            console.log("- projectName:", projectName)
+            console.log("- description:", description)
+            console.log("- userId:", userId)
+            console.log("- auth.id:", e.auth?.id)
             
             // Create bedarf entry for this project
-            const bedarfCollection = $app.dao().findCollectionByNameOrId("bedarf")
+            const bedarfCollection = $app.findCollectionByNameOrId("user_needs")
             if (bedarfCollection) {
                 const bedarfRecord = new Record(bedarfCollection, {
                     "project_id": projectId,
-                    "user_id": userId,
-                    "initial_description": `${projectName}: ${description}`,
-                    "status": "draft",
-                    "ai_provider": "openrouter"
+                    "user_id": userId || e.auth?.id,
+                    "thema": projectName || "Neues Projekt",
+                    "beschreibung": description || "",
+                    "status": "created"
                 })
-                $app.dao().saveRecord(bedarfRecord)
+                $app.save(bedarfRecord)
                 console.log("✅ Bedarf entry created for project:", bedarfRecord.id)
                 
                 // Create log entry
-                const logsCollection = $app.dao().findCollectionByNameOrId("logs")
+                const logsCollection = $app.findCollectionByNameOrId("logs")
                 const logRecord = new Record(logsCollection, {
                     "message": `Bedarf workflow initialized for project ${projectName}`,
                     "level": "info",
                     "request_id": projectId
                 })
-                $app.dao().saveRecord(logRecord)
+                $app.save(logRecord)
             } else {
                 console.log("⚠️ bedarf collection not found, skipping")
                 if (typeof createLog === 'function') {
@@ -110,16 +117,16 @@ onRecordCreateRequest((e) => {
             
             // Update status to processing
             e.record.set("status", "processing")
-            $app.dao().saveRecord(e.record)
+            $app.save(e.record)
             
             // Create log entry
-            const logsCollection = $app.dao().findCollectionByNameOrId("logs")
+            const logsCollection = $app.findCollectionByNameOrId("logs")
             const logRecord = new Record(logsCollection, {
                 "message": `Template-based generation initiated for request ${e.record.id}`,
                 "level": "info",
                 "request_id": e.record.id
             })
-            $app.dao().saveRecord(logRecord)
+            $app.save(logRecord)
             
             // Note: Actual document generation should be handled through the bedarf workflow
             // This hook is kept for backward compatibility
